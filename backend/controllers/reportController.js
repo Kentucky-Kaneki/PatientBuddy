@@ -1,17 +1,20 @@
 // controllers/reportController.js
-import axios from "axios";
 import mongoose from "mongoose";
 import Report from "../models/Report.js";
 import Chunk from "../models/Chunk.js";
-import { ChromaClient } from "chromadb";
+import axios from "axios";
 
+import { CloudClient } from "chromadb";
 
 // ==========================================
 // ChromaDB Client
 // ==========================================
-const chromaClient = new ChromaClient({
-  host: process.env.CHROMA_HOST || "localhost",
-  port: parseInt(process.env.CHROMA_PORT) || 8000,
+
+
+const chromaClient = new CloudClient({
+  apiKey: 'ck-5Z8wR3DvJ5ikWMWGqXjuWThjEjkL7TfrErU3sNUZzLQx',
+  tenant: 'aa344572-9b98-4886-b96d-dbd64f131057',
+  database: 'patientbuddy'
 });
 
 // Get API key from environment
@@ -477,7 +480,7 @@ export const deleteReport = async (req, res) => {
   }
 };
 
-export const healthCheck = async (req, res) => {
+export const conahealthCheck = async (req, res) => {
   let chroma = "disconnected";
   try {
     await chromaClient.heartbeat();
