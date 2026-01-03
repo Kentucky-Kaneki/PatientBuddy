@@ -194,7 +194,7 @@ const delay = (ms) => new Promise(resolve => setTimeout(resolve, ms));
 
 // Simple in-memory rate limiter
 let lastGroqCall = 0;
-const MIN_GROQ_INTERVAL = 5000; // 2 seconds between calls
+const MIN_GROQ_INTERVAL = 10000; // 2 seconds between calls
 
 async function rateLimitedGroqCall(apiKey, payload) {
   const now = Date.now();

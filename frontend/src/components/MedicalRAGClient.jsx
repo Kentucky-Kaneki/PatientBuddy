@@ -1,345 +1,226 @@
-// MedicalRAGClient.jsx
+import { useState, useCallback } from "react";
+import { Link, useNavigate } from "react-router-dom";
+import { motion, AnimatePresence } from "framer-motion";
+import {
+  ArrowLeft,
+  Upload,
+  FileText,
+  X,
+  CheckCircle,
+  Loader2,
+  Image,
+  File,
+  Heart,
+} from "lucide-react";
 
-import React, { useState, useEffect, useRef } from "react";
-import { Upload, FileText, Bot, Send, Trash2, AlertCircle } from "lucide-react";
+import { Button } from "@/components/ui/button";
+import { Progress } from "@/components/ui/progress";
+import { useToast } from "@/hooks/use-toast";
+
 import { getDocument, GlobalWorkerOptions } from "pdfjs-dist";
-
 
 GlobalWorkerOptions.workerSrc =
   "https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.11.174/pdf.worker.min.js";
 
-function MedicalRAGClient () {
+const API_BASE = "http://localhost:5050/api";
+
+const UploadReport = () => {
+  const [dragActive, setDragActive] = useState(false);
   const [file, setFile] = useState(null);
-  const [fileName, setFileName] = useState("");
-  const [loading, setLoading] = useState(false);
-  const [errorMsg, setErrorMsg] = useState("");
-  const [successMsg, setSuccessMsg] = useState("");
+  const [uploadState, setUploadState] = useState("idle");
+  const [progress, setProgress] = useState(0);
 
-  const [patient, setPatient] = useState(null);
-  const [currentReport, setCurrentReport] = useState(null);
-  const [reports, setReports] = useState([]);
+  const navigate = useNavigate();
+  const { toast } = useToast();
 
-  const [summary, setSummary] = useState("");
+  // 🔹 TEMP patient (same as MedicalRAGClient)
+  const patientId = "507f1f77bcf86cd799439011";
 
-  const [chatMessages, setChatMessages] = useState([]);
-  const [chatInput, setChatInput] = useState("");
-  const [showChat, setShowChat] = useState(false);
-  const [chatLoading, setChatLoading] = useState(false);
-
-  const chatEndRef = useRef(null);
-  const API_BASE = "http://localhost:5000/api";
-
-  useEffect(() => {
-    const mockPatient = {
-      _id: "507f1f77bcf86cd799439011",
-      name: "Demo Patient",
-      email: "demo@example.com",
-    };
-    setPatient(mockPatient);
-    loadReports(mockPatient._id);
-  }, []);
-
-  useEffect(() => {
-    chatEndRef.current?.scrollIntoView({ behavior: "smooth" });
-  }, [chatMessages]);
-
-  const loadReports = async (patientId) => {
-    try {
-      const res = await fetch(`${API_BASE}/patients/${patientId}/reports`);
-      const data = await res.json();
-      if (data.success) setReports(data.reports);
-    } catch (err) {
-      console.error("Load reports error:", err);
-    }
-  };
-
+  // ---------- Helpers ----------
   const extractTextFromPDF = async (file) => {
-    const arrayBuffer = await file.arrayBuffer();
-    const pdf = await getDocument({ data: arrayBuffer }).promise;
+    const buffer = await file.arrayBuffer();
+    const pdf = await getDocument({ data: buffer }).promise;
 
     let text = "";
     for (let i = 1; i <= pdf.numPages; i++) {
       const page = await pdf.getPage(i);
       const content = await page.getTextContent();
-      text += content.items.map((item) => item.str).join(" ") + "\n";
+      text += content.items.map((i) => i.str).join(" ") + "\n";
     }
     return text;
   };
 
-  const handleFileChange = (e) => {
-    const selected = e.target.files[0];
-    setFile(selected);
-    setFileName(selected?.name || "");
-    setErrorMsg("");
-    setSuccessMsg("");
+  const handleFile = (selectedFile) => {
+    const validTypes = [
+      "application/pdf",
+      "image/jpeg",
+      "image/png",
+      "image/heic",
+    ];
+
+    if (!validTypes.includes(selectedFile.type)) {
+      toast({
+        title: "Invalid file type",
+        description: "Upload a PDF or image",
+        variant: "destructive",
+      });
+      return;
+    }
+    setFile(selectedFile);
   };
 
+  // ---------- REAL UPLOAD ----------
   const handleUpload = async () => {
-    if (!file) return setErrorMsg("Please select a PDF file.");
-
-    setLoading(true);
-    setErrorMsg("");
-    setSuccessMsg("");
-    setSummary("");
-    setCurrentReport(null);
-    setChatMessages([]);
+    if (!file) return;
 
     try {
-      setSuccessMsg("📄 Extracting text from PDF...");
+      setUploadState("processing");
+      setProgress(20);
+
       const fullText = await extractTextFromPDF(file);
+      if (!fullText.trim()) throw new Error("No text found in document");
 
-      if (!fullText.trim()) {
-        throw new Error("No text extracted from PDF");
-      }
+      setProgress(50);
 
-      setSuccessMsg("🔄 Uploading & processing...");
-      const res = await fetch(`${API_BASE}/reports/upload`, {
+      // 🔹 Upload report
+      const uploadRes = await fetch(`${API_BASE}/reports/upload`, {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
-          patientId: patient._id,
+          patientId,
           fullText,
-          fileName,
+          fileName: file.name,
         }),
       });
 
-      const data = await res.json();
-      if (!data.success) throw new Error(data.error);
+      const uploadData = await uploadRes.json();
+      if (!uploadData.success) throw new Error(uploadData.error);
 
-      setCurrentReport(data);
-      setSuccessMsg("🤖 Generating summary...");
+      setProgress(75);
 
-      const summaryRes = await fetch(
-        `${API_BASE}/reports/${data.reportId}/summarize`,
-        {
-          method: "POST",
-          headers: { "Content-Type": "application/json" }
-        }
+      // 🔹 Generate summary
+      await fetch(
+        `${API_BASE}/reports/${uploadData.reportId}/summarize`,
+        { method: "POST" }
       );
 
-      const summaryData = await summaryRes.json();
-      if (summaryData.success) {
-        setSummary(summaryData.summary);
-        setSuccessMsg("✅ Report analyzed successfully!");
-        setShowChat(true);
-      } else {
-        throw new Error(summaryData.error);
-      }
+      setProgress(100);
+      setUploadState("complete");
 
-      loadReports(patient._id);
-    } catch (err) {
-      console.error(err);
-      setErrorMsg("❌ " + err.message);
-    } finally {
-      setLoading(false);
-    }
-  };
-
-  const handleChatSubmit = async (e) => {
-    e?.preventDefault();
-    if (!chatInput.trim() || !currentReport || chatLoading) return;
-
-    const userMsg = { role: "user", content: chatInput };
-    setChatMessages((p) => [...p, userMsg]);
-    setChatInput("");
-    setChatLoading(true);
-
-    try {
-      const reportId = currentReport.reportId || currentReport._id;
-
-      console.log("Helloooo");
-      
-      const res = await fetch(`${API_BASE}/reports/${reportId}/query`, {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ query: userMsg.content, topK: 5 }),
+      toast({
+        title: "Report analyzed",
+        description: "Redirecting to results…",
       });
 
-      console.log("Chat response:");
-
-      const data = await res.json();
-      
-      if (!data.success) {
-        // Handle rate limiting specifically
-        if (res.status === 429) {
-          throw new Error("Rate limit exceeded. Please wait a few seconds and try again.");
-        }
-        throw new Error(data.error || "Query failed");
-      }
-
-      const assistantMsg = {
-        role: "assistant",
-        content: data.answer,
-        sources: data.sources || [],
-      };
-
-      setChatMessages((p) => [...p, assistantMsg]);
+      setTimeout(() => {
+        navigate(`/report/${uploadData.reportId}`);
+      }, 1200);
     } catch (err) {
-      console.error("Chat error:", err);
-      const errorContent = err.message.includes("Rate limit") 
-        ? "⏳ " + err.message 
-        : "❌ Error: " + err.message;
-      
-      setChatMessages((p) => [
-        ...p,
-        { role: "assistant", content: errorContent, isError: true },
-      ]);
-    } finally {
-      setChatLoading(false);
+      console.error(err);
+      toast({
+        title: "Upload failed",
+        description: err.message,
+        variant: "destructive",
+      });
+      setUploadState("idle");
+      setProgress(0);
     }
   };
 
+  const removeFile = () => {
+    setFile(null);
+    setUploadState("idle");
+    setProgress(0);
+  };
+
+  const getFileIcon = (type) =>
+    type.startsWith("image/")
+      ? <Image className="w-6 h-6 text-primary" />
+      : <File className="w-6 h-6 text-primary" />;
+
+  // ---------- UI ----------
   return (
-    <div className="p-6 min-h-screen bg-gradient-to-br from-blue-50 to-indigo-100">
-      <div className="max-w-6xl mx-auto">
-        <h1 className="text-5xl font-bold text-center mb-2 text-indigo-900">
-          🏥 Medical RAG System
-        </h1>
-        <p className="text-center text-gray-600 mb-8">
-          AI-Powered Medical Report Analysis
-        </p>
-
-        {/* Upload Section */}
-        <div className="bg-white p-8 rounded-lg shadow-lg mb-6">
-          <h2 className="text-2xl font-semibold mb-4 flex items-center gap-2">
-            <Upload className="w-6 h-6 text-indigo-600" />
-            Upload Medical Report
-          </h2>
-          
-          <div className="flex flex-col gap-4">
-            <input
-              type="file"
-              accept=".pdf"
-              onChange={handleFileChange}
-              className="block w-full text-sm text-gray-500 file:mr-4 file:py-2 file:px-4 file:rounded-full file:border-0 file:text-sm file:font-semibold file:bg-indigo-50 file:text-indigo-700 hover:file:bg-indigo-100"
-            />
-            
-            <button
-              onClick={handleUpload}
-              disabled={loading || !file}
-              className="px-6 py-3 bg-indigo-600 text-white rounded-lg font-semibold hover:bg-indigo-700 disabled:bg-gray-300 disabled:cursor-not-allowed transition-colors flex items-center justify-center gap-2"
-            >
-              {loading ? (
-                <>
-                  <div className="animate-spin rounded-full h-5 w-5 border-b-2 border-white"></div>
-                  Processing...
-                </>
-              ) : (
-                <>
-                  <Upload className="w-5 h-5" />
-                  Upload & Analyze
-                </>
-              )}
-            </button>
+    <div className="min-h-screen bg-background">
+      <header className="sticky top-0 z-50 border-b">
+        <div className="container mx-auto px-4 py-4 flex items-center gap-4">
+          <Link to="/dashboard">
+            <Button variant="ghost" size="icon">
+              <ArrowLeft />
+            </Button>
+          </Link>
+          <div className="flex items-center gap-2">
+            <div className="w-8 h-8 rounded-lg bg-primary flex items-center justify-center">
+              <Heart className="w-4 h-4 text-white" />
+            </div>
+            <span className="font-semibold">Upload Medical Report</span>
           </div>
-
-          {errorMsg && (
-            <div className="mt-4 p-4 bg-red-50 border-l-4 border-red-500 rounded flex items-start gap-2">
-              <AlertCircle className="w-5 h-5 text-red-600 flex-shrink-0 mt-0.5" />
-              <p className="text-red-700">{errorMsg}</p>
-            </div>
-          )}
-
-          {successMsg && (
-            <div className="mt-4 p-4 bg-green-50 border-l-4 border-green-500 rounded">
-              <p className="text-green-700">{successMsg}</p>
-            </div>
-          )}
         </div>
+      </header>
 
-        {/* Summary Section */}
-        {summary && (
-          <div className="bg-white p-8 rounded-lg shadow-lg mb-6">
-            <h2 className="text-2xl font-semibold mb-4 flex items-center gap-2">
-              <FileText className="w-6 h-6 text-indigo-600" />
-              Medical Report Summary
-            </h2>
-            <div className="prose max-w-none">
-              <pre className="whitespace-pre-wrap text-gray-700 font-sans bg-gray-50 p-4 rounded">
-                {summary}
-              </pre>
-            </div>
-          </div>
-        )}
-
-        {/* Chat Section */}
-        {showChat && currentReport && (
-          <div className="bg-white rounded-lg shadow-lg overflow-hidden">
-            <div className="bg-indigo-600 text-white p-4 flex items-center gap-2">
-              <Bot className="w-6 h-6" />
-              <h2 className="text-xl font-semibold">Ask Questions About the Report</h2>
-            </div>
-
-            {/* Chat Messages */}
-            <div className="h-96 overflow-y-auto p-6 bg-gray-50">
-              {chatMessages.length === 0 ? (
-                <div className="text-center text-gray-500 py-12">
-                  <Bot className="w-12 h-12 mx-auto mb-4 text-gray-400" />
-                  <p>Ask me anything about the medical report!</p>
+      <main className="container mx-auto px-4 py-8 max-w-2xl">
+        <motion.div initial={{ opacity: 0, y: 20 }} animate={{ opacity: 1, y: 0 }}>
+          <AnimatePresence mode="wait">
+            {uploadState === "idle" && (
+              <>
+                <div className="border-2 border-dashed rounded-2xl p-8 text-center">
+                  <input
+                    type="file"
+                    className="absolute inset-0 opacity-0 cursor-pointer"
+                    onChange={(e) => handleFile(e.target.files[0])}
+                    accept=".pdf,.jpg,.jpeg,.png,.heic"
+                  />
+                  <Upload className="mx-auto mb-4 text-primary" size={32} />
+                  <p className="font-medium">Click to upload</p>
                 </div>
-              ) : (
-                <div className="space-y-4">
-                  {chatMessages.map((msg, idx) => (
-                    <div
-                      key={idx}
-                      className={`flex ${
-                        msg.role === "user" ? "justify-end" : "justify-start"
-                      }`}
-                    >
-                      <div
-                        className={`max-w-[80%] rounded-lg p-4 ${
-                          msg.role === "user"
-                            ? "bg-indigo-600 text-white"
-                            : msg.isError
-                            ? "bg-red-50 border border-red-200 text-red-700"
-                            : "bg-white border border-gray-200"
-                        }`}
-                      >
-                        <p className="whitespace-pre-wrap">{msg.content}</p>
-                      </div>
-                    </div>
-                  ))}
-                  {chatLoading && (
-                    <div className="flex justify-start">
-                      <div className="bg-white border border-gray-200 rounded-lg p-4">
-                        <div className="flex gap-2">
-                          <div className="w-2 h-2 bg-gray-400 rounded-full animate-bounce"></div>
-                          <div className="w-2 h-2 bg-gray-400 rounded-full animate-bounce" style={{ animationDelay: "0.1s" }}></div>
-                          <div className="w-2 h-2 bg-gray-400 rounded-full animate-bounce" style={{ animationDelay: "0.2s" }}></div>
-                        </div>
-                      </div>
-                    </div>
-                  )}
-                  <div ref={chatEndRef} />
-                </div>
-              )}
-            </div>
 
-            {/* Chat Input */}
-            <form onSubmit={handleChatSubmit} className="border-t p-4 bg-white">
-              <div className="flex gap-2">
-                <input
-                  value={chatInput}
-                  onChange={(e) => setChatInput(e.target.value)}
-                  className="flex-1 border border-gray-300 rounded-lg px-4 py-2 focus:outline-none focus:ring-2 focus:ring-indigo-600"
-                  placeholder="Ask a question about the report..."
-                  disabled={chatLoading}
-                />
-                <button
-                  type="submit"
-                  disabled={chatLoading || !chatInput.trim()}
-                  className="px-6 py-2 bg-indigo-600 text-white rounded-lg font-semibold hover:bg-indigo-700 disabled:bg-gray-300 disabled:cursor-not-allowed transition-colors flex items-center gap-2"
-                >
-                  <Send className="w-5 h-5" />
-                  Send
-                </button>
+                {file && (
+                  <div className="mt-4 flex items-center gap-4 p-4 border rounded-xl">
+                    {getFileIcon(file.type)}
+                    <div className="flex-1">
+                      <p className="font-medium truncate">{file.name}</p>
+                      <p className="text-sm text-muted-foreground">
+                        {(file.size / 1024 / 1024).toFixed(2)} MB
+                      </p>
+                    </div>
+                    <Button size="icon-sm" variant="ghost" onClick={removeFile}>
+                      <X />
+                    </Button>
+                  </div>
+                )}
+
+                {file && (
+                  <Button
+                    variant="hero"
+                    size="lg"
+                    className="w-full mt-6"
+                    onClick={handleUpload}
+                  >
+                    <FileText className="mr-2" />
+                    Analyze Report
+                  </Button>
+                )}
+              </>
+            )}
+
+            {uploadState === "processing" && (
+              <div className="p-8 text-center border rounded-2xl">
+                <Loader2 className="mx-auto animate-spin mb-4 text-primary" />
+                <Progress value={progress} />
+                <p className="mt-2 text-sm">{progress}%</p>
               </div>
-            </form>
-          </div>
-        )}
-      </div>
+            )}
+
+            {uploadState === "complete" && (
+              <div className="p-8 text-center border rounded-2xl bg-success/10">
+                <CheckCircle className="mx-auto text-success mb-4" size={32} />
+                <p>Analysis complete</p>
+              </div>
+            )}
+          </AnimatePresence>
+        </motion.div>
+      </main>
     </div>
   );
 };
 
-export default MedicalRAGClient;
+export default UploadReport;
