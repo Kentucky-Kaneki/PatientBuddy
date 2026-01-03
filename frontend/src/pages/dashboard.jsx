@@ -159,13 +159,12 @@ const Dashboard = () => {
           </Link>
 
           <div className="flex items-center gap-4">
-            <Button variant="ghost" size="icon" onClick={handleLogout}>
-              <LogOut className="w-5 h-5" />
-            </Button>
             <Avatar>
               <AvatarImage />
               <AvatarFallback className="bg-primary text-primary-foreground">
-                JD
+                <Button variant="ghost" size="icon" onClick={handleLogout}>
+                  <LogOut className="w-5 h-5" />
+                </Button>
               </AvatarFallback>
             </Avatar>
           </div>
