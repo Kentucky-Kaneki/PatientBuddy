@@ -3,7 +3,7 @@ import { BrowserRouter } from "react-router-dom";
 import PrescriptionReader from "./components/PrescriptionReader.jsx";
 // import './index.css'
 // import App from './App.jsx'
-import MedicalRAGClient from "./Components/MedicalRAGClient";
+import MedicalRAGClient from "./components/MedicalRAGClient";
 
 createRoot(document.getElementById('root')).render(
     <PrescriptionReader />

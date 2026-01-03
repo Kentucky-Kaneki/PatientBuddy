@@ -29,8 +29,6 @@ function MedicalRAGClient () {
   const chatEndRef = useRef(null);
   const API_BASE = "http://localhost:5000/api";
 
-  const GROQ_API_KEY = "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" // Replace with your actual GROQ API key
-
   useEffect(() => {
     const mockPatient = {
       _id: "507f1f77bcf86cd799439011",
@@ -115,8 +113,7 @@ function MedicalRAGClient () {
         `${API_BASE}/reports/${data.reportId}/summarize`,
         {
           method: "POST",
-          headers: { "Content-Type": "application/json" },
-          body: JSON.stringify({ groqApiKey: GROQ_API_KEY }),
+          headers: { "Content-Type": "application/json" }
         }
       );
 
@@ -150,14 +147,18 @@ function MedicalRAGClient () {
     try {
       const reportId = currentReport.reportId || currentReport._id;
 
+      console.log("Helloooo");
+      
       const res = await fetch(`${API_BASE}/reports/${reportId}/query`, {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ query: userMsg.content, topK: 5 }),
       });
 
-      const data = await res.json();
+      console.log("Chat response:");
 
+      const data = await res.json();
+      
       if (!data.success) {
         // Handle rate limiting specifically
         if (res.status === 429) {
