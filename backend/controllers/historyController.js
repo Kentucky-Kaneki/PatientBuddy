@@ -1,14 +1,13 @@
-import Report from "../models/Report.js";
-import Prescription from "../models/Prescription.js";
+import Member from "../models/Member.js";
 
 export const getUserHistory = async (req, res) => {
   try {
-    const { userId, search = "", type = "all" } = req.query;
+    const { memberId, search = "", type = "all" } = req.query;
 
-    if (!userId) {
+    if (!memberId) {
       return res.status(400).json({
         success: false,
-        message: "userId is required",
+        message: "memberId is required",
       });
     }
 
@@ -16,41 +15,47 @@ export const getUserHistory = async (req, res) => {
 
     /* ================= REPORTS ================= */
     if (type === "all" || type === "report") {
-      const reports = await Report.find({
-        patient: userId, // patient == userId (as per your data)
-        fileName: { $regex: search, $options: "i" },
-      })
-        .sort({ uploadDate: -1 })
+      const member = await Member.findById(memberId)
+        .populate('reports', 'fileName summary keyFindings recommendations uploadDate')
         .lean();
+
+      const reports = (member.reports || [])
+        .filter(r => search === '' || (r.fileName && r.fileName.match(new RegExp(search, 'i'))))
+        .sort((a, b) => new Date(b.uploadDate) - new Date(a.uploadDate));
 
       history.push(
         ...reports.map((r) => ({
           id: r._id,
           type: "report",
           title: r.fileName,
-          date: r.uploadDate,
-          lab: "Uploaded Report",
+          summary: r.summary,
+          recommendations: r.recommendations,
           highlights: r.keyFindings ? [r.keyFindings] : [],
+          date: r.uploadDate,
+          lab: "Uploaded Report"
         }))
       );
     }
 
     /* ================= PRESCRIPTIONS ================= */
     if (type === "all" || type === "prescription") {
-      const prescriptions = await Prescription.find({
-        user: userId,
-      })
-        .sort({ createdAt: -1 })
+      const member = await Member.findById(memberId)
+        .populate('prescriptions', 'symptoms findings medications createdAt')
         .lean();
+
+      const prescriptions = (member.prescriptions || [])
+        .sort((a, b) => new Date(b.uploadDate) - new Date(a.uploadDate));
 
       history.push(
         ...prescriptions.map((p) => ({
           id: p._id,
           type: "prescription",
           title: "Doctor Prescription",
+          symptoms: p.symptoms,
+          findings: p.findings,
           date: p.createdAt,
           lab: "Prescription",
-          highlights: p.medications.map(
+          medications: p.medications.map(
             (m) => `${m.name} ${m.dosage}`
           ),
         }))
