@@ -480,7 +480,7 @@ export const deleteReport = async (req, res) => {
   }
 };
 
-export const conahealthCheck = async (req, res) => {
+export const healthCheck = async (req, res) => {
   let chroma = "disconnected";
   try {
     await chromaClient.heartbeat();
