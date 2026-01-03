@@ -1,77 +1,43 @@
-// // App.jsx
+import { Toaster } from "@/components/ui/toaster";
+import { Toaster as Sonner } from "@/components/ui/sonner";
+import { TooltipProvider } from "@/components/ui/tooltip";
+import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
+import { BrowserRouter, Routes, Route } from "react-router-dom";
+import Landing from "./pages/landing";
+import Login from "./pages/login";
+import Signup from "./pages/signup";
+import Dashboard from "./pages/dashboard";
+import UploadReport from "./pages/uploadreport";
+import ReportView from "./pages/reportview";
+import PrescriptionView from "./pages/prescriptionview";
+import Chat from "./pages/chat";
+import History from "./pages/history";
+import NotFound from "./pages/notfound";
 
-// import { useState, useEffect } from 'react';
-// import { useNavigate } from 'react-router-dom';
-// import SignIn from './components/signin';
-// import SignUp from './components/signup';
-// import Dashboard from './components/dashboard';
+const queryClient = new QueryClient();
 
-// export default function App() {
-//   const [currentPage, setCurrentPage] = useState('signin');
-//   const navigate = useNavigate();
+const App = () => (
+  <QueryClientProvider client={queryClient}>
+    <TooltipProvider>
+      <Toaster />
+      <Sonner />
+      <BrowserRouter>
+        <Routes>
+          <Route path="/" element={<Landing />} />
+          <Route path="/login" element={<Login />} />
+          <Route path="/signup" element={<Signup />} />
+          <Route path="/dashboard" element={<Dashboard />} />
+          <Route path="/upload/report" element={<UploadReport />} />
+          <Route path="/upload/prescription" element={<UploadReport />} />
+          <Route path="/report/:id" element={<ReportView />} />
+          <Route path="/prescription/:id" element={<PrescriptionView />} />
+          <Route path="/chat" element={<Chat />} />
+          <Route path="/history" element={<History />} />
+          <Route path="*" element={<NotFound />} />
+        </Routes>
+      </BrowserRouter>
+    </TooltipProvider>
+  </QueryClientProvider>
+);
 
-//   useEffect(() => {
-//     const token = localStorage.getItem('token');
-//     if (token) {
-//       setCurrentPage('dashboard');
-//     } else {
-//       setCurrentPage('signin');
-//     }
-//   }, []);
-  
-//   // after signing in, go to dashboard
-//   const handleSignIn = (token) => {
-//     localStorage.setItem('token', token);
-//     setCurrentPage('dashboard');
-//   };
-
-//   // after signing up, go to sign in
-//   const handleSignUp = () => {
-//     setCurrentPage('signin');
-//   };
-
-//   // after signing out, back to home page
-//   const handleSignOut = () => {
-//     localStorage.removeItem('token');
-//     setCurrentPage('home');
-//     navigate('/');
-//   };
-
-//   // switch to sign up
-//   const switchToSignUp = () => {
-//     setCurrentPage('signup');
-//   };
-
-//   // switch to sign in
-//   const switchToSignIn = () => {
-//     setCurrentPage('signin');
-//   };
-
-//   switch (currentPage) {
-//     case 'signin':
-//       return (
-//         <SignIn 
-//           onSignIn={handleSignIn} 
-//           onSwitchToSignUp={switchToSignUp} 
-//         />
-//       );
-
-//     case 'signup':
-//       return (
-//         <SignUp 
-//           onSignUp={handleSignUp} 
-//           onSwitchToSignIn={switchToSignIn} 
-//         />
-//       );
-
-//     case 'dashboard':
-//       return (
-//         <Dashboard 
-//           onSignOut={handleSignOut}
-//         />
-//       );
-
-//     default:
-//       return null;
-//   }
-// }
+export default App;
