@@ -3,3 +3,10 @@ uvicorn
 pillow
 pytesseract
 python-multipart
+groq
+sentence_transformers
+faiss-cpu
+python-dotenv
+numpy
+requests
+twilio

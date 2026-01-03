@@ -3,7 +3,7 @@ from fastapi.middleware.cors import CORSMiddleware
 import pytesseract
 from PIL import Image
 import shutil
-import os, json, pickle, re
+import os, json, pickle, re, uuid
 
 from groq import Groq
 from sentence_transformers import SentenceTransformer
@@ -269,7 +269,7 @@ def preprocess_image(image_path: str):
     img = enhancer.enhance(1.2)
     
     # Save preprocessed image
-    processed_path = "processed_" + image_path
+    processed_path = f"processed_{uuid.uuid4().hex}.png"
     img.save(processed_path)
     
     return processed_path
@@ -277,6 +277,7 @@ def preprocess_image(image_path: str):
 # ================= UPLOAD ENDPOINT =================
 @app.post("/upload")
 async def upload_image(file: UploadFile = File(...)):
+    print("RECEIVED FILE:", file.filename, file.content_type)
     image_path = "uploaded.png"
 
     with open(image_path, "wb") as buffer:
