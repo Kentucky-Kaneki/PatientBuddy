@@ -22,12 +22,22 @@ function App() {
       const formData = new FormData();
       formData.append("file", file);
 
+      console.log("Uploading to backend...");
+
       const res = await fetch("http://127.0.0.1:8000/upload", {
         method: "POST",
         body: formData,
       });
 
+      console.log("Response status:", res.status);
+
+      // ✅ Check if response is OK before parsing JSON
+      if (!res.ok) {
+        throw new Error(`HTTP error! status: ${res.status}`);
+      }
+
       const data = await res.json();
+      console.log("Received data:", data);
 
       setOcrText(data.ocr_text || "");
       setMedicines(data.parsed_medicines || []);
@@ -35,10 +45,10 @@ function App() {
       setMedicineInfo({});
     } catch (err) {
       console.error("UPLOAD ERROR:", err);
-      alert("Upload failed");
+      alert(`Upload failed: ${err.message}`);
+    } finally {
+      setLoading(false);
     }
-
-    setLoading(false);
   };
 
   const toggleMedicineInfo = async (index, medicineName) => {
@@ -51,23 +61,35 @@ function App() {
     setInfoLoading(true);
 
     try {
+      console.log("Fetching info for:", medicineName);
+
       const res = await fetch(
-        `http://127.0.0.1:8000/medicine/${medicineName}`
+        `http://127.0.0.1:8000/medicine/${encodeURIComponent(medicineName)}`
       );
+
+      console.log("Medicine info response status:", res.status);
+
+      // ✅ Check if response is OK before parsing JSON
+      if (!res.ok) {
+        throw new Error(`HTTP error! status: ${res.status}`);
+      }
+
       const data = await res.json();
+      console.log("Medicine info data:", data);
 
       setMedicineInfo((prev) => ({
         ...prev,
         [index]: data.info,
       }));
     } catch (err) {
+      console.error("Medicine info error:", err);
       setMedicineInfo((prev) => ({
         ...prev,
-        [index]: "Failed to load medicine information.",
+        [index]: `Failed to load medicine information: ${err.message}`,
       }));
+    } finally {
+      setInfoLoading(false);
     }
-
-    setInfoLoading(false);
   };
 
   return (
@@ -101,13 +123,14 @@ function App() {
           <br /><br />
           <button
             onClick={uploadImage}
+            disabled={loading}
             style={{
               padding: "10px 20px",
-              background: "#4f46e5",
+              background: loading ? "#9ca3af" : "#4f46e5",
               color: "#fff",
               border: "none",
               borderRadius: "6px",
-              cursor: "pointer",
+              cursor: loading ? "not-allowed" : "pointer",
             }}
           >
             {loading ? "Analyzing..." : "Upload & Analyze"}
