@@ -1,21 +1,22 @@
 from fastapi import FastAPI, UploadFile, File
 from fastapi.middleware.cors import CORSMiddleware
 import pytesseract
-from PIL import Image
+from PIL import Image, ImageEnhance, ImageFilter
 import shutil
-import os, json, pickle, re
+import os
+import json
+import pickle
+import re
 from pydantic import BaseModel
-import os, json, pickle, re, uuid
 
 from groq import Groq
 from sentence_transformers import SentenceTransformer
 import faiss
 from dotenv import load_dotenv
-import os
 
+# ================= LOAD ENV =================
 BASE_DIR = os.path.dirname(os.path.abspath(__file__))
 load_dotenv(os.path.join(BASE_DIR, ".env"))
-
 
 # ================= TESSERACT PATH =================
 pytesseract.pytesseract.tesseract_cmd = r"C:\Program Files\Tesseract-OCR\tesseract.exe"
@@ -26,14 +27,14 @@ app = FastAPI()
 # ================= CORS =================
 app.add_middleware(
     CORSMiddleware,
-    allow_origins=["http://localhost:3000"],
+    allow_origins=["*"],  # Allow all origins temporarily
     allow_credentials=True,
     allow_methods=["*"],
     allow_headers=["*"],
 )
 
 # ================= GROQ CLIENT =================
-groq_client = Groq(api_key=os.getenv("GROK_KEY"))
+groq_client = Groq(api_key=os.getenv("GROQ_API_KEY"))
 
 # ================= EMBEDDING MODEL =================
 embedding_model = SentenceTransformer("all-MiniLM-L6-v2")
@@ -42,6 +43,46 @@ embedding_model = SentenceTransformer("all-MiniLM-L6-v2")
 faiss_index = faiss.read_index("faiss_index/index.faiss")
 with open("faiss_index/texts.pkl", "rb") as f:
     knowledge_texts = pickle.load(f)
+
+# ================= BRAND TO GENERIC MAPPING =================
+BRAND_TO_GENERIC = {
+    "panrace": "paracetamol",
+    "crocin": "paracetamol",
+    "dolo": "paracetamol",
+    "tylenol": "paracetamol",
+    "calpol": "paracetamol",
+    "amoxil": "amoxicillin",
+    "mox": "amoxicillin",
+    "augmentin": "amoxicillin",
+}
+
+# ================= STANDARD DOSAGE INFO =================
+STANDARD_DOSAGES = {
+    "paracetamol": {
+        "dosage": "500mg-1000mg per dose",
+        "frequency": "every 4-6 hours (max 4 times daily)",
+        "max_daily": "4000mg per day",
+        "notes": "Take after food"
+    },
+    "amoxicillin": {
+        "dosage": "250mg-500mg per dose",
+        "frequency": "three times daily (every 8 hours)",
+        "max_daily": "1500mg per day for mild infections",
+        "notes": "Complete the full course"
+    },
+    "ibuprofen": {
+        "dosage": "200mg-400mg per dose",
+        "frequency": "every 4-6 hours",
+        "max_daily": "1200mg per day",
+        "notes": "Take with food"
+    },
+    "cetirizine": {
+        "dosage": "10mg per dose",
+        "frequency": "once daily",
+        "max_daily": "10mg per day",
+        "notes": "May cause drowsiness"
+    }
+}
 
 # ================= SAFE JSON EXTRACTOR =================
 def extract_json(text: str):
@@ -109,34 +150,7 @@ PRESCRIPTION TEXT:
 
     return extract_json(response.choices[0].message.content)
 
-# ================= STANDARD DOSAGE INFO =================
-STANDARD_DOSAGES = {
-    "paracetamol": {
-        "dosage": "500mg-1000mg per dose",
-        "frequency": "every 4-6 hours (max 4 times daily)",
-        "max_daily": "4000mg per day",
-        "notes": "Take after food"
-    },
-    "amoxicillin": {
-        "dosage": "250mg-500mg per dose",
-        "frequency": "three times daily (every 8 hours)",
-        "max_daily": "1500mg per day for mild infections",
-        "notes": "Complete the full course"
-    },
-    "ibuprofen": {
-        "dosage": "200mg-400mg per dose",
-        "frequency": "every 4-6 hours",
-        "max_daily": "1200mg per day",
-        "notes": "Take with food"
-    },
-    "cetirizine": {
-        "dosage": "10mg per dose",
-        "frequency": "once daily",
-        "max_daily": "10mg per day",
-        "notes": "May cause drowsiness"
-    }
-}
-
+# ================= STANDARD DOSAGE INFO FUNCTION =================
 def get_standard_dosage_info(medicine_name: str):
     """
     Get standard dosage information as fallback
@@ -148,16 +162,6 @@ def get_standard_dosage_info(medicine_name: str):
         return f"\n\nStandard Dosage Guidelines:\n\nTypical dose: {info['dosage']}\nFrequency: {info['frequency']}\nMaximum daily dose: {info['max_daily']}\nImportant note: {info['notes']}\n\nDisclaimer: These are general guidelines. Always follow your doctor's prescription."
     
     return ""
-BRAND_TO_GENERIC = {
-    "panrace": "paracetamol",
-    "crocin": "paracetamol",
-    "dolo": "paracetamol",
-    "tylenol": "paracetamol",
-    "calpol": "paracetamol",
-    "amoxil": "amoxicillin",
-    "mox": "amoxicillin",
-    "augmentin": "amoxicillin",
-}
 
 # ================= RAG MEDICINE INFO (ENHANCED) =================
 def get_medicine_info_rag(medicine_name: str):
@@ -251,74 +255,102 @@ Write your response in plain text paragraphs only."""
 
 # ================= IMAGE PREPROCESSING =================
 def preprocess_image(image_path: str):
-    from PIL import ImageEnhance, ImageFilter
-
-    # ❗ Skip preprocessing for PDFs
+    """
+    Enhance image quality before OCR
+    """
+    # Skip preprocessing for PDFs
     if image_path.lower().endswith(".pdf"):
         return image_path
 
     img = Image.open(image_path)
+    
+    # Convert to grayscale
     img = img.convert("L")
-
+    
+    # Increase contrast
     enhancer = ImageEnhance.Contrast(img)
     img = enhancer.enhance(2.0)
-
+    
+    # Sharpen
     img = img.filter(ImageFilter.SHARPEN)
-
+    
+    # Increase brightness slightly
     enhancer = ImageEnhance.Brightness(img)
     img = enhancer.enhance(1.2)
     
     # Save preprocessed image
-    processed_path = "processed_" + image_path
+    processed_path = "processed_" + os.path.basename(image_path)
     img.save(processed_path)
-
+    
     return processed_path
-
 
 # ================= UPLOAD ENDPOINT =================
 @app.post("/upload")
 async def upload_image(file: UploadFile = File(...)):
-    print("RECEIVED FILE:", file.filename, file.content_type)
-    image_path = "uploaded.png"
-
-    with open(image_path, "wb") as buffer:
-        shutil.copyfileobj(file.file, buffer)
-
-    # Preprocess image for better OCR
-    processed_path = preprocess_image(image_path)
-    
-    # Run OCR on preprocessed image
-    ocr_text = pytesseract.image_to_string(
-        Image.open(processed_path),
-        config='--psm 6'  # Assume uniform block of text
-    )
-    
-    print("="*50)
-    print("OCR TEXT:", ocr_text)
-    print("="*50)
-
     try:
-        parsed_medicines = parse_prescription_with_llm(ocr_text)
-        print("PARSED MEDICINES:", json.dumps(parsed_medicines, indent=2))
-    except Exception as e:
-        print("LLM PARSE ERROR:", e)
-        parsed_medicines = []
+        print("RECEIVED FILE:", file.filename, file.content_type)
+        image_path = "uploaded.png"
 
-    return {
-        "ocr_text": ocr_text,
-        "parsed_medicines": parsed_medicines,
-    }
+        with open(image_path, "wb") as buffer:
+            shutil.copyfileobj(file.file, buffer)
+
+        # Preprocess image for better OCR
+        processed_path = preprocess_image(image_path)
+        
+        # Run OCR on preprocessed image
+        ocr_text = pytesseract.image_to_string(
+            Image.open(processed_path),
+            config='--psm 6'  # Assume uniform block of text
+        )
+        
+        print("="*50)
+        print("OCR TEXT:", ocr_text)
+        print("="*50)
+
+        try:
+            parsed_medicines = parse_prescription_with_llm(ocr_text)
+            print("PARSED MEDICINES:", json.dumps(parsed_medicines, indent=2))
+        except Exception as e:
+            print("LLM PARSE ERROR:", e)
+            parsed_medicines = []
+
+        response_data = {
+            "ocr_text": ocr_text,
+            "parsed_medicines": parsed_medicines,
+            "status": "success"
+        }
+        
+        print("SENDING RESPONSE:", json.dumps(response_data, indent=2))
+        return response_data
+        
+    except Exception as e:
+        print("UPLOAD ERROR:", str(e))
+        import traceback
+        traceback.print_exc()
+        return {
+            "ocr_text": "",
+            "parsed_medicines": [],
+            "status": "error",
+            "error": str(e)
+        }
 
 # ================= MEDICINE INFO ENDPOINT =================
 @app.get("/medicine/{name}")
 def medicine_info(name: str):
     try:
+        print(f"Medicine info requested for: {name}")
         info = get_medicine_info_rag(name)
+        print(f"Medicine info retrieved successfully for: {name}")
+        return {"info": info, "status": "success"}
     except Exception as e:
-        print("RAG ERROR:", e)
-        info = "Information currently unavailable."
-
-    return {"info": info}
+        print(f"RAG ERROR for {name}:", str(e))
+        import traceback
+        traceback.print_exc()
+        return {
+            "info": "Information currently unavailable. Please try again or consult a healthcare professional.",
+            "status": "error",
+            "error": str(e)
+        }
 
 # ================= HEALTH CHECK =================
 @app.get("/")
@@ -326,11 +358,9 @@ def health_check():
     return {"status": "ok", "message": "Prescription Parser API is running"}
 
 # ================= WHATSAPP ANALYSIS ENDPOINT =================
-
 class WhatsAppAnalyzeRequest(BaseModel):
     file_path: str
     profile: str
-
 
 @app.post("/whatsapp/analyze")
 def whatsapp_analyze(req: WhatsAppAnalyzeRequest):
@@ -357,7 +387,7 @@ def whatsapp_analyze(req: WhatsAppAnalyzeRequest):
     if not medicines:
         return {
             "summary": (
-                "⚠️ I couldn’t clearly read this prescription.\n"
+                "⚠️ I couldn't clearly read this prescription.\n"
                 "Please upload a clearer image or consult your doctor."
             )
         }
@@ -373,7 +403,7 @@ def whatsapp_analyze(req: WhatsAppAnalyzeRequest):
         )
 
     lines.append(
-        "⚠️ This is an AI-generated summary. Always follow your doctor’s advice."
+        "⚠️ This is an AI-generated summary. Always follow your doctor's advice."
     )
 
     return {
