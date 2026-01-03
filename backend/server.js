@@ -2,7 +2,7 @@ import express from "express";
 import mongoose from "mongoose";
 import dotenv from "dotenv";
 import cors from "cors";
-
+import Groq from "groq-sdk";
 dotenv.config();
 
 import insightsRoutes from "./routes/insightsRoutes.js";
