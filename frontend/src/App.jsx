@@ -1,75 +1,35 @@
-import { useState, useEffect } from 'react';
-import { useNavigate } from 'react-router-dom';
-import SignIn from './signin';
-import SignUp from './signup';
-import Dashboard from './dashboard';
+import { useState } from 'react'
+import reactLogo from './assets/react.svg'
+import viteLogo from '/vite.svg'
+import './App.css'
 
-export default function App() {
-  const [currentPage, setCurrentPage] = useState('signin');
-  const navigate = useNavigate();
+function App() {
+  const [count, setCount] = useState(0)
 
-  useEffect(() => {
-    const token = localStorage.getItem('token');
-    if (token) {
-      setCurrentPage('dashboard');
-    } else {
-      setCurrentPage('signin');
-    }
-  }, []);
-  
-  // after signing in, go to dashboard
-  const handleSignIn = (token) => {
-    localStorage.setItem('token', token);
-    setCurrentPage('dashboard');
-  };
-
-  // after signing up, go to sign in
-  const handleSignUp = () => {
-    setCurrentPage('signin');
-  };
-
-  // after signing out, back to home page
-  const handleSignOut = () => {
-    localStorage.removeItem('token');
-    setCurrentPage('home');
-    navigate('/');
-  };
-
-  // switch to sign up
-  const switchToSignUp = () => {
-    setCurrentPage('signup');
-  };
-
-  // switch to sign in
-  const switchToSignIn = () => {
-    setCurrentPage('signin');
-  };
-
-  switch (currentPage) {
-    case 'signin':
-      return (
-        <SignIn 
-          onSignIn={handleSignIn} 
-          onSwitchToSignUp={switchToSignUp} 
-        />
-      );
-
-    case 'signup':
-      return (
-        <SignUp 
-          onSignUp={handleSignUp} 
-          onSwitchToSignIn={switchToSignIn} 
-        />
-      );
-
-    case 'dashboard':
-      return (
-        <Dashboard 
-          onSignOut={handleSignOut}
-        />
-      );
-
-    default:
-      return null;
-  }
+  return (
+    <>
+      <div>
+        <a href="https://vite.dev" target="_blank">
+          <img src={viteLogo} className="logo" alt="Vite logo" />
+        </a>
+        <a href="https://react.dev" target="_blank">
+          <img src={reactLogo} className="logo react" alt="React logo" />
+        </a>
+      </div>
+      <h1>Vite + React</h1>
+      <div className="card">
+        <button onClick={() => setCount((count) => count + 1)}>
+          count is {count}
+        </button>
+        <p>
+          Edit <code>src/App.jsx</code> and save to test HMR
+        </p>
+      </div>
+      <p className="read-the-docs">
+        Click on the Vite and React logos to learn more
+      </p>
+    </>
+  )
 }
+
+export default App
