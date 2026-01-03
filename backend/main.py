@@ -3,15 +3,19 @@ from fastapi.middleware.cors import CORSMiddleware
 import pytesseract
 from PIL import Image
 import shutil
+import os, json, pickle, re
+from pydantic import BaseModel
 import os, json, pickle, re, uuid
 
 from groq import Groq
 from sentence_transformers import SentenceTransformer
 import faiss
 from dotenv import load_dotenv
+import os
 
-# ================= LOAD ENV =================
-load_dotenv()
+BASE_DIR = os.path.dirname(os.path.abspath(__file__))
+load_dotenv(os.path.join(BASE_DIR, ".env"))
+
 
 # ================= TESSERACT PATH =================
 pytesseract.pytesseract.tesseract_cmd = r"C:\Program Files\Tesseract-OCR\tesseract.exe"
@@ -29,7 +33,7 @@ app.add_middleware(
 )
 
 # ================= GROQ CLIENT =================
-groq_client = Groq(api_key=os.getenv("GROQ_API_KEY"))
+groq_client = Groq(api_key=os.getenv("GROK_KEY"))
 
 # ================= EMBEDDING MODEL =================
 embedding_model = SentenceTransformer("all-MiniLM-L6-v2")
@@ -247,32 +251,29 @@ Write your response in plain text paragraphs only."""
 
 # ================= IMAGE PREPROCESSING =================
 def preprocess_image(image_path: str):
-    """
-    Enhance image quality before OCR
-    """
     from PIL import ImageEnhance, ImageFilter
-    
+
+    # ❗ Skip preprocessing for PDFs
+    if image_path.lower().endswith(".pdf"):
+        return image_path
+
     img = Image.open(image_path)
-    
-    # Convert to grayscale
-    img = img.convert('L')
-    
-    # Increase contrast
+    img = img.convert("L")
+
     enhancer = ImageEnhance.Contrast(img)
     img = enhancer.enhance(2.0)
-    
-    # Sharpen
+
     img = img.filter(ImageFilter.SHARPEN)
-    
-    # Increase brightness slightly
+
     enhancer = ImageEnhance.Brightness(img)
     img = enhancer.enhance(1.2)
     
     # Save preprocessed image
-    processed_path = f"processed_{uuid.uuid4().hex}.png"
+    processed_path = "processed_" + image_path
     img.save(processed_path)
-    
+
     return processed_path
+
 
 # ================= UPLOAD ENDPOINT =================
 @app.post("/upload")
@@ -323,3 +324,58 @@ def medicine_info(name: str):
 @app.get("/")
 def health_check():
     return {"status": "ok", "message": "Prescription Parser API is running"}
+
+# ================= WHATSAPP ANALYSIS ENDPOINT =================
+
+class WhatsAppAnalyzeRequest(BaseModel):
+    file_path: str
+    profile: str
+
+
+@app.post("/whatsapp/analyze")
+def whatsapp_analyze(req: WhatsAppAnalyzeRequest):
+    """
+    Endpoint used ONLY by WhatsApp bot.
+    It receives a file path already saved by WhatsApp,
+    runs OCR + LLM parsing, and returns a short summary.
+    """
+
+    # --- OCR ---
+    processed_path = preprocess_image(req.file_path)
+    ocr_text = pytesseract.image_to_string(
+        Image.open(processed_path),
+        config="--psm 6"
+    )
+
+    # --- LLM parsing ---
+    try:
+        medicines = parse_prescription_with_llm(ocr_text)
+    except Exception:
+        medicines = []
+
+    # --- Build WhatsApp-safe summary ---
+    if not medicines:
+        return {
+            "summary": (
+                "⚠️ I couldn’t clearly read this prescription.\n"
+                "Please upload a clearer image or consult your doctor."
+            )
+        }
+
+    lines = [f"📄 Prescription Summary ({req.profile})\n"]
+
+    for med in medicines:
+        lines.append(
+            f"💊 {med['medicine'].title()}\n"
+            f"• Dosage: {med['dosage'] or 'As prescribed'}\n"
+            f"• Frequency: {med['frequency'] or 'As directed'}\n"
+            f"• Duration: {med['duration'] or 'As advised'}\n"
+        )
+
+    lines.append(
+        "⚠️ This is an AI-generated summary. Always follow your doctor’s advice."
+    )
+
+    return {
+        "summary": "\n".join(lines)
+    }

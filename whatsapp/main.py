@@ -4,6 +4,19 @@ from twilio.twiml.messaging_response import MessagingResponse
 import requests
 import os
 import uuid
+from PIL import Image
+import io
+from dotenv import load_dotenv
+import os
+
+BASE_DIR = os.path.dirname(os.path.abspath(__file__))
+
+# adjust path to backend/.env
+load_dotenv(os.path.join(BASE_DIR, "../backend/.env"))
+
+
+TWILIO_ACCOUNT_SID = os.getenv("TWILIO_ACCOUNT_SID")
+TWILIO_AUTH_TOKEN = os.getenv("TWILIO_AUTH_TOKEN")
 
 app = FastAPI()
 
@@ -77,31 +90,42 @@ async def whatsapp_webhook(request: Request):
     # STEP 1: MEDIA UPLOAD
     # ----------------------------
     if num_media > 0 and media_url:
-        # Decide extension
-        ext = "pdf" if media_type and "pdf" in media_type else "jpg"
-        filename = f"{uuid.uuid4()}.{ext}"
-        file_path = os.path.join(UPLOAD_DIR, filename)
 
-        # Download file
-        r = requests.get(media_url)
-        with open(file_path, "wb") as f:
-            f.write(r.content)
+        try:
+            # 1️⃣ Download WhatsApp media
+            img_bytes = requests.get(
+                media_url,
+                auth=(TWILIO_ACCOUNT_SID, TWILIO_AUTH_TOKEN)
+            ).content
 
-        session["state"] = "AWAITING_PROFILE"
-        session["last_file"] = file_path
 
-        # Fetch profiles (from "DB")
-        profiles = user_profiles.get(phone_number, ["Self"])
+            # 2️⃣ Open image (jpg / jpeg / webp)
+            img = Image.open(io.BytesIO(img_bytes))
 
-        profile_text = "\n".join(
-            [f"{i+1}️⃣ {p}" for i, p in enumerate(profiles)]
-        )
+            # 3️⃣ FORCE convert to PNG (backend expects this)
+            img.convert("RGB").save("uploaded.png", "PNG")
 
-        resp.message(
-            "📄 Report received!\n\n"
-            "Whose report is this?\n"
-            f"{profile_text}"
-        )
+            # 4️⃣ Store canonical path
+            session["state"] = "AWAITING_PROFILE"
+            session["last_file"] = "uploaded.png"
+
+            # 5️⃣ Ask for profile
+            profiles = user_profiles.get(phone_number, ["Self"])
+            profile_text = "\n".join(
+                [f"{i+1}️⃣ {p}" for i, p in enumerate(profiles)]
+            )
+
+            resp.message(
+                "📄 Report received!\n\n"
+                "Whose report is this?\n"
+                f"{profile_text}"
+            )
+
+        except Exception:
+            resp.message(
+                "❌ I couldn’t read this image.\n"
+                "Please send a clear photo of the report."
+            )
 
     # ----------------------------
     # STEP 2: PROFILE SELECTION
@@ -114,13 +138,27 @@ async def whatsapp_webhook(request: Request):
             selected_profile = profiles[choice]
             session["state"] = "IDLE"
 
-            resp.message(
-                f"✅ Report saved under profile: *{selected_profile}*\n\n"
-                "Next steps:\n"
-                "- OCR\n"
-                "- Lab value extraction\n"
-                "- AI summary"
-            )
+            try:
+                with open(session["last_file"], "rb") as f:
+                    backend_response = requests.post(
+                    "http://localhost:8000/upload",
+                    files={"file": f},
+                    timeout=180
+                )
+
+                data = backend_response.json()
+                ocr_text = data.get("ocr_text", "")
+
+                resp.message(
+                    f"📄 *OCR Result ({selected_profile})*:\n\n{ocr_text}"
+                )
+
+
+            except Exception:
+                resp.message(
+                    "⚠️ The report was saved, but analysis failed.\n"
+                    "Please try again later."
+                )
         else:
             resp.message("❌ Invalid choice. Please select a valid profile number.")
 
