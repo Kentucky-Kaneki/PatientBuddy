@@ -1,16 +1,14 @@
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import { Link } from "react-router-dom";
 import { motion } from "framer-motion";
+import axios from "axios";
+
 import {
   ArrowLeft,
   FileText,
   Pill,
   Search,
-  Calendar,
   ChevronRight,
-  TrendingUp,
-  TrendingDown,
-  Minus,
   Heart,
 } from "lucide-react";
 
@@ -20,88 +18,74 @@ import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 
-const historyData = [
-  {
-    id: 1,
-    type: "report",
-    title: "Complete Blood Count (CBC)",
-    date: "Dec 28, 2024",
-    lab: "HealthFirst Diagnostics",
-    status: "analyzed",
-    highlights: ["Vitamin D low", "Hemoglobin improved"],
-    trend: "improved",
-  },
-  {
-    id: 2,
-    type: "prescription",
-    title: "Dr. Michael Chen Prescription",
-    date: "Dec 25, 2024",
-    lab: "Family Health Center",
-    status: "analyzed",
-    highlights: ["Amoxicillin 500mg", "Vitamin C"],
-  },
-  {
-    id: 3,
-    type: "report",
-    title: "Thyroid Function Test",
-    date: "Dec 20, 2024",
-    lab: "Metro Labs",
-    status: "needs attention",
-    highlights: ["TSH slightly elevated"],
-    trend: "watch",
-  },
-  {
-    id: 4,
-    type: "report",
-    title: "Lipid Profile",
-    date: "Dec 15, 2024",
-    lab: "HealthFirst Diagnostics",
-    status: "analyzed",
-    highlights: ["Cholesterol normal", "HDL good"],
-    trend: "improved",
-  },
-];
-
-const healthTrends = [
-  { name: "Hemoglobin", current: "14.2 g/dL", previous: "12.8 g/dL", trend: "up", change: "+10.9%" },
-  { name: "Vitamin D", current: "18 ng/mL", previous: "15 ng/mL", trend: "up", change: "+20%" },
-  { name: "Cholesterol", current: "185 mg/dL", previous: "210 mg/dL", trend: "down", change: "-11.9%" },
-  { name: "TSH", current: "4.8 mIU/L", previous: "3.5 mIU/L", trend: "up", change: "+37%" },
-];
-
 const History = () => {
+  const [historyData, setHistoryData] = useState([]);
   const [searchQuery, setSearchQuery] = useState("");
   const [activeFilter, setActiveFilter] = useState("all");
+  const [loading, setLoading] = useState(false);
+  const [error, setError] = useState(null);
 
-  const filteredHistory = historyData.filter((item) => {
-    const matchesSearch = item.title
-      .toLowerCase()
-      .includes(searchQuery.toLowerCase());
-    const matchesFilter =
-      activeFilter === "all" || item.type === activeFilter;
-    return matchesSearch && matchesFilter;
-  });
+  // 🔹 Fetch history from backend
+  const fetchHistory = async () => {
+    try {
+      setLoading(true);
+      setError(null);
+      
+      const token = localStorage.getItem("token");
+      const userId = localStorage.getItem("userId");
 
-  const getTrendIcon = (trend) => {
-    if (trend === "up") return <TrendingUp className="w-4 h-4 text-success" />;
-    if (trend === "down") return <TrendingDown className="w-4 h-4 text-success" />;
-    return <Minus className="w-4 h-4 text-muted-foreground" />;
+      // 🔍 DEBUG LOGS
+      console.log("🔍 Token:", token ? "✅ exists" : "❌ missing");
+      console.log("🔍 UserId:", userId);
+      console.log("🔍 All localStorage:", { ...localStorage });
+
+      if (!userId) {
+        setError("User ID not found. Please log in again.");
+        console.error("❌ No userId in localStorage");
+        return;
+      }
+
+      console.log("📤 Sending request with:", {
+        userId,
+        search: searchQuery,
+        type: activeFilter,
+      });
+
+      const res = await axios.get("http://localhost:5050/api/history", {
+        params: {
+          userId,
+          search: searchQuery,
+          type: activeFilter,
+        },
+        headers: token ? { Authorization: `Bearer ${token}` } : {},
+      });
+
+      console.log("✅ Response received:", res.data);
+      setHistoryData(res.data.data || []);
+      
+    } catch (error) {
+      console.error("❌ Failed to fetch history:", error);
+      console.error("❌ Error response:", error.response?.data);
+      console.error("❌ Error status:", error.response?.status);
+      
+      setError(
+        error.response?.data?.message || 
+        "Failed to load history. Please try again."
+      );
+    } finally {
+      setLoading(false);
+    }
   };
 
-  const getTrendColor = (name, trend) => {
-    if (name === "Cholesterol") {
-      return trend === "down" ? "text-success" : "text-warning";
-    }
-    if (name === "TSH") {
-      return trend === "up" ? "text-warning" : "text-success";
-    }
-    return trend === "up" ? "text-success" : "text-warning";
-  };
+  // 🔁 Refetch on search / filter change
+  useEffect(() => {
+    fetchHistory();
+  }, [searchQuery, activeFilter]);
 
   return (
     <div className="min-h-screen bg-background">
       {/* Header */}
-      <header className="sticky top-0 z-50 border-b">
+      <header className="sticky top-0 z-50 border-b bg-background">
         <div className="container mx-auto px-4 py-4 flex items-center gap-4">
           <Link to="/dashboard">
             <Button variant="ghost" size="icon">
@@ -125,10 +109,10 @@ const History = () => {
               <TabsTrigger value="trends">Health Trends</TabsTrigger>
             </TabsList>
 
-            {/* DOCUMENTS */}
+            {/* ================= DOCUMENTS ================= */}
             <TabsContent value="documents" className="space-y-6">
-              <div className="flex gap-4">
-                <div className="relative flex-1">
+              <div className="flex gap-4 flex-wrap">
+                <div className="relative flex-1 min-w-[200px]">
                   <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-5 h-5 text-muted-foreground" />
                   <Input
                     placeholder="Search documents..."
@@ -137,6 +121,7 @@ const History = () => {
                     className="pl-10 h-12"
                   />
                 </div>
+
                 {["all", "report", "prescription"].map((f) => (
                   <Button
                     key={f}
@@ -145,73 +130,103 @@ const History = () => {
                     onClick={() => setActiveFilter(f)}
                     className="capitalize"
                   >
-                    {f === "all" ? "All" : f + "s"}
+                    {f === "all" ? "All" : `${f}s`}
                   </Button>
                 ))}
               </div>
 
-              {filteredHistory.map((item) => (
-                <Link
-                  key={item.id}
-                  to={item.type === "report" ? `/report/${item.id}` : `/prescription/${item.id}`}
-                >
-                  <Card className="hover:border-primary/40 transition mb-4">
-                    <CardContent className="p-5 flex gap-4">
-                      <div
-                        className={`w-12 h-12 rounded-xl flex items-center justify-center ${
-                          item.type === "report" ? "bg-primary/10" : "bg-success/10"
-                        }`}
-                      >
-                        {item.type === "report" ? (
-                          <FileText className="text-primary" />
-                        ) : (
-                          <Pill className="text-success" />
-                        )}
-                      </div>
-                      <div className="flex-1">
-                        <h3 className="font-semibold">{item.title}</h3>
-                        <p className="text-sm text-muted-foreground">
-                          {item.date} • {item.lab}
-                        </p>
-                        <div className="flex gap-2 mt-2 flex-wrap">
-                          {item.highlights.map((h, i) => (
-                            <Badge key={i} variant="outline">{h}</Badge>
-                          ))}
+              {/* Error Message */}
+              {error && (
+                <Card className="border-destructive">
+                  <CardContent className="p-4">
+                    <p className="text-destructive text-sm">{error}</p>
+                  </CardContent>
+                </Card>
+              )}
+
+              {/* Loading */}
+              {loading && (
+                <p className="text-center text-muted-foreground py-10">
+                  Loading history...
+                </p>
+              )}
+
+              {/* Empty */}
+              {!loading && !error && historyData.length === 0 && (
+                <Card>
+                  <CardContent className="p-10 text-center">
+                    <p className="text-muted-foreground">
+                      No documents found
+                    </p>
+                    <p className="text-sm text-muted-foreground mt-2">
+                      Upload a report or create a prescription to see them here
+                    </p>
+                  </CardContent>
+                </Card>
+              )}
+
+              {/* List */}
+              {!loading &&
+                !error &&
+                historyData.map((item) => (
+                  <Link
+                    key={item.id}
+                    to={
+                      item.type === "report"
+                        ? `/report/${item.id}`
+                        : `/prescription/${item.id}`
+                    }
+                  >
+                    <Card className="hover:border-primary/40 transition mb-4">
+                      <CardContent className="p-5 flex gap-4">
+                        <div
+                          className={`w-12 h-12 rounded-xl flex items-center justify-center shrink-0 ${
+                            item.type === "report"
+                              ? "bg-primary/10"
+                              : "bg-success/10"
+                          }`}
+                        >
+                          {item.type === "report" ? (
+                            <FileText className="text-primary" />
+                          ) : (
+                            <Pill className="text-success" />
+                          )}
                         </div>
-                      </div>
-                      <ChevronRight className="text-muted-foreground" />
-                    </CardContent>
-                  </Card>
-                </Link>
-              ))}
+
+                        <div className="flex-1 min-w-0">
+                          <h3 className="font-semibold truncate">{item.title}</h3>
+                          <p className="text-sm text-muted-foreground">
+                            {new Date(item.date).toLocaleDateString()} •{" "}
+                            {item.lab}
+                          </p>
+
+                          <div className="flex gap-2 mt-2 flex-wrap">
+                            {item.highlights?.slice(0, 3).map((h, i) => (
+                              <Badge key={i} variant="outline" className="text-xs">
+                                {h}
+                              </Badge>
+                            ))}
+                          </div>
+                        </div>
+
+                        <ChevronRight className="text-muted-foreground shrink-0" />
+                      </CardContent>
+                    </Card>
+                  </Link>
+                ))}
             </TabsContent>
 
-            {/* TRENDS */}
+            {/* ================= TRENDS ================= */}
             <TabsContent value="trends">
               <Card>
                 <CardHeader>
                   <CardTitle>Key Health Metrics</CardTitle>
                 </CardHeader>
-                <CardContent className="space-y-4">
-                  {healthTrends.map((m) => (
-                    <div key={m.name} className="flex justify-between p-4 border rounded-xl">
-                      <div className="flex gap-3">
-                        {getTrendIcon(m.trend)}
-                        <div>
-                          <p className="font-medium">{m.name}</p>
-                          <p className="text-sm text-muted-foreground">
-                            Previous: {m.previous}
-                          </p>
-                        </div>
-                      </div>
-                      <div className="text-right">
-                        <p className="font-semibold">{m.current}</p>
-                        <p className={`text-sm ${getTrendColor(m.name, m.trend)}`}>
-                          {m.change}
-                        </p>
-                      </div>
-                    </div>
-                  ))}
+                <CardContent>
+                  <p className="text-muted-foreground text-sm">
+                    Health trends will be generated automatically from your
+                    reports.
+                  </p>
                 </CardContent>
               </Card>
             </TabsContent>

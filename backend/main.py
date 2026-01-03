@@ -8,6 +8,7 @@ import json
 import pickle
 import re
 from pydantic import BaseModel
+import platform
 
 from groq import Groq
 from sentence_transformers import SentenceTransformer
