@@ -1,5 +1,4 @@
 import { useState, useEffect } from "react";
-import { useNavigate } from "react-router-dom";
 import { Link } from "react-router-dom";
 import { motion } from "framer-motion";
 import { Heart, Mail, Lock, Eye, EyeOff, ArrowRight } from "lucide-react";
@@ -7,6 +6,7 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { useToast } from "@/hooks/use-toast";
+import { useAuth } from "@/context/AuthContext";
 
 const Login = () => {
   const [email, setEmail] = useState("");
@@ -14,48 +14,35 @@ const Login = () => {
   const [showPassword, setShowPassword] = useState(false);
   const [isLoading, setIsLoading] = useState(false);
   const { toast } = useToast();
-  const navigate = useNavigate();
+  const { login, user } = useAuth();
 
-  // Auto-redirect if token exists (runs on mount)
+  // Auto-redirect if already logged in
   useEffect(() => {
-    const token = localStorage.getItem("token");
-    if (token) {
-     navigate("/dashboard", { replace: true });
+    if (user) {
+      window.location.href = "/dashboard";
     }
-  }, []);
+  }, [user]);
 
   const handleSubmit = async (e) => {
     e.preventDefault();
     setIsLoading(true);
 
-    try {      
-      const response = await fetch("http://localhost:5050/api/patient/signin", {
-        method: "POST",
-        headers: {
-          "Content-Type": "application/json", 
-        },
-        body: JSON.stringify({ email, password }), 
-      });
+    try {
+      const result = await login(email, password);
 
-      if (response.status === 404) {
+      if (result.success) {
+        toast({
+          title: "Welcome back!",
+          description: "You have been successfully logged in.",
+        });
+        // Navigation is handled by AuthContext
+      } else {
         toast({
           title: "Login Failed",
-          description: "Invalid email or password. Please try again."
+          description: result.error || "Invalid email or password. Please try again.",
+          variant: "destructive",
         });
-        return;
       }
-
-      const data = await response.json();
-
-      localStorage.setItem("token", data.token);
-
-      toast({
-        title: "Welcome back!",
-        description: "You have been successfully logged in.",
-      });
-
-    // Navigate to dashboard
-    navigate("/dashboard", { replace: true });
     } catch (error) {
       console.error(error);
       toast({
@@ -65,7 +52,7 @@ const Login = () => {
       });
     } finally {
       setIsLoading(false);
-    }    
+    }
   };
 
   return (
