@@ -19,7 +19,7 @@ export const requireAuth = (req, res, next) => {
 // ✅ SIGNUP
 export const signup = async (req, res) => {
   try {
-    const { name, email, password, licenseNumber, specialization } = req.body;
+    const { name, email, password, phone } = req.body;
 
     const existingUser = await User.findOne({ email });
     if (existingUser) return res.status(400).json({ message: "User already exists" });
@@ -30,12 +30,26 @@ export const signup = async (req, res) => {
       name,
       email,
       password: hashedPassword,
-      licenseNumber,
-      specialization
-    });
+      phone,
+    });    
 
     await newUser.save();
-    res.status(201).json({ message: "Signup successful", user: newUser });
+
+    const token = jwt.sign(
+      { id: newUser._id, email: newUser.email },
+      process.env.JWT_SECRET,
+      { expiresIn: "5h" }
+    );
+    
+    res.status(201).json({ 
+      message: "Signup successful", 
+      token,
+      user: {
+        id: newUser._id,
+        name: newUser.name,
+        email: newUser.email
+      }
+    });
   } catch (err) {
     res.status(500).json({ message: "Server error", error: err.message });
   }
@@ -44,30 +58,43 @@ export const signup = async (req, res) => {
 // ✅ SIGNIN
 export const signin = async (req, res) => {
   try {
-    const { email, licenseNumber, password } = req.body;
+    const { email, password } = req.body;
 
-    // Find user by BOTH email AND licenseNumber for better security
-    const user = await User.findOne({ 
-      email: email,
-      licenseNumber: licenseNumber 
-    });
+    // Validate input
+    if (!email || !password) {
+      return res.status(400).json({ message: "Email and password required" });
+    }
+
+    console.log(email);
     
-    if (!user) return res.status(404).json({ message: "User not found" });
+    const user = await User.findOne({ email });
+    
+    if (user == null) {
+      return res.status(404).json({ message: "Invalid credentials" });
+    }
 
     const isMatch = await bcrypt.compare(password, user.password);
-    if (!isMatch) return res.status(400).json({ message: "Invalid credentials" });
-    
+    if (!isMatch) {
+      return res.status(400).json({ message: "Invalid credentials" });
+    }
+
     const token = jwt.sign(
       { id: user._id, email: user.email },
       process.env.JWT_SECRET,
       { expiresIn: "5h" }
     );
-    
-    res.json({
+
+    res.status(200).json({ 
+      message: "Login successful",
       token,
-      user: { id: user._id, email: user.email, name: user.name, specialization: user.specialization }
+      user: {
+        id: user._id,
+        name: user.name,
+        email: user.email
+      }
     });
   } catch (err) {
+    console.error("Signin error:", err);
     res.status(500).json({ message: "Server error", error: err.message });
   }
 };

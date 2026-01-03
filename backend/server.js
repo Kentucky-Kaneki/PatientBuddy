@@ -21,7 +21,8 @@ app.use((req, res, next) => {
 });
 
 
-app.use('/api', reportRoutes);
+app.use('/api/reports', reportRoutes);
+app.use('/api/patient', userRoutes);
 
 // Root route
 app.get('/', (req, res) => {
@@ -60,7 +61,7 @@ app.use((err, req, res, next) => {
 });
 
 
-const PORT = process.env.PORT || 5000;
+const PORT = 5050;
 
 const startServer = async () => {
   try {

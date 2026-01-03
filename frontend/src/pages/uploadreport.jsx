@@ -17,22 +17,48 @@ import { Button } from "@/components/ui/button";
 import { Progress } from "@/components/ui/progress";
 import { useToast } from "@/hooks/use-toast";
 
+import { getDocument, GlobalWorkerOptions } from "pdfjs-dist";
+
+// PDF worker
+GlobalWorkerOptions.workerSrc =
+  "https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.11.174/pdf.worker.min.js";
+
+// 🔧 CONFIG
+const API_BASE = "http://localhost:5050/api";
+const DEMO_PATIENT_ID = "507f1f77bcf86cd799439011";
+
 const UploadReport = () => {
   const [dragActive, setDragActive] = useState(false);
   const [file, setFile] = useState(null);
-  const [uploadState, setUploadState] = useState("idle");
+  const [uploadState, setUploadState] = useState("idle"); // idle | uploading | processing | complete
   const [progress, setProgress] = useState(0);
 
   const navigate = useNavigate();
   const { toast } = useToast();
 
+  /* ----------------------------------
+     Helpers
+  -----------------------------------*/
+
+  const extractTextFromPDF = async (file) => {
+    const arrayBuffer = await file.arrayBuffer();
+    const pdf = await getDocument({ data: arrayBuffer }).promise;
+
+    let text = "";
+    for (let i = 1; i <= pdf.numPages; i++) {
+      const page = await pdf.getPage(i);
+      const content = await page.getTextContent();
+      text += content.items.map((item) => item.str).join(" ") + "\n";
+    }
+    return text;
+  };
+
   const handleDrag = useCallback((e) => {
     e.preventDefault();
     e.stopPropagation();
-
     if (e.type === "dragenter" || e.type === "dragover") {
       setDragActive(true);
-    } else if (e.type === "dragleave") {
+    } else {
       setDragActive(false);
     }
   }, []);
@@ -42,13 +68,13 @@ const UploadReport = () => {
     e.stopPropagation();
     setDragActive(false);
 
-    if (e.dataTransfer.files && e.dataTransfer.files[0]) {
+    if (e.dataTransfer.files?.[0]) {
       handleFile(e.dataTransfer.files[0]);
     }
   }, []);
 
   const handleFileInput = (e) => {
-    if (e.target.files && e.target.files[0]) {
+    if (e.target.files?.[0]) {
       handleFile(e.target.files[0]);
     }
   };
@@ -64,7 +90,7 @@ const UploadReport = () => {
     if (!validTypes.includes(selectedFile.type)) {
       toast({
         title: "Invalid file type",
-        description: "Please upload a PDF or image file (JPEG, PNG, HEIC)",
+        description: "Please upload a PDF or image file",
         variant: "destructive",
       });
       return;
@@ -73,50 +99,103 @@ const UploadReport = () => {
     setFile(selectedFile);
   };
 
-  const handleUpload = async () => {
-    if (!file) return;
-
-    setUploadState("uploading");
-
-    // Simulate upload
-    for (let i = 0; i <= 100; i += 10) {
-      await new Promise((r) => setTimeout(r, 100));
-      setProgress(i);
-    }
-
-    setUploadState("processing");
-    setProgress(0);
-
-    // Simulate processing
-    for (let i = 0; i <= 100; i += 5) {
-      await new Promise((r) => setTimeout(r, 100));
-      setProgress(i);
-    }
-
-    setUploadState("complete");
-
-    toast({
-      title: "Report Analyzed!",
-      description: "Your medical report has been successfully analyzed.",
-    });
-
-    setTimeout(() => {
-      navigate("/report/1");
-    }, 1500);
-  };
-
   const removeFile = () => {
     setFile(null);
     setUploadState("idle");
     setProgress(0);
   };
 
-  const getFileIcon = (type) => {
-    if (type.startsWith("image/")) {
-      return <Image className="w-6 h-6 text-primary" />;
+  const getFileIcon = (type) =>
+    type.startsWith("image/")
+      ? <Image className="w-6 h-6 text-primary" />
+      : <File className="w-6 h-6 text-primary" />;
+
+  /* ----------------------------------
+     REAL UPLOAD + AI PIPELINE
+  -----------------------------------*/
+
+  const handleUpload = async () => {
+    if (!file) return;
+
+    try {
+      setUploadState("uploading");
+      setProgress(20);
+
+      // 1️⃣ Extract text
+      if (file.type !== "application/pdf") {
+        toast({
+          title: "Image OCR coming soon",
+          description: "Please upload a PDF for now",
+          variant: "destructive",
+        });
+        return;
+      }
+
+      const extractedText = await extractTextFromPDF(file);
+      if (!extractedText.trim()) {
+        throw new Error("No readable text found in PDF");
+      }
+
+      setUploadState("processing");
+      setProgress(50);
+
+      // 2️⃣ Upload report
+      const uploadRes = await fetch(`${API_BASE}/reports/upload`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          patientId: DEMO_PATIENT_ID,
+          fullText: extractedText,
+          fileName: file.name,
+        }),
+      });
+
+      const uploadData = await uploadRes.json();
+      if (!uploadData.success) {
+        throw new Error(uploadData.error);
+      }
+
+      setProgress(75);
+
+      // 3️⃣ Summarize
+      const summaryRes = await fetch(
+        `${API_BASE}/reports/${uploadData.reportId}/summarize`,
+        { method: "POST" }
+      );
+
+      const summaryData = await summaryRes.json();
+      if (!summaryData.success) {
+        throw new Error(summaryData.error);
+      }
+
+      setProgress(100);
+      setUploadState("complete");
+
+      toast({
+        title: "Report analyzed",
+        description: "AI summary generated successfully",
+      });
+
+      // 4️⃣ Redirect
+      setTimeout(() => {
+        navigate(`/report/${uploadData.reportId}`);
+      }, 1200);
+
+    } catch (err) {
+      console.error(err);
+      toast({
+        title: "Upload failed",
+        description: err.message,
+        variant: "destructive",
+      });
+      setUploadState("idle");
+      setProgress(0);
     }
-    return <File className="w-6 h-6 text-primary" />;
   };
+
+  /* ----------------------------------
+     UI
+  -----------------------------------*/
 
   return (
     <div className="min-h-screen bg-background">
@@ -140,10 +219,11 @@ const UploadReport = () => {
       <main className="container mx-auto px-4 py-8 max-w-2xl">
         <motion.div initial={{ opacity: 0, y: 20 }} animate={{ opacity: 1, y: 0 }}>
           <AnimatePresence mode="wait">
+
             {uploadState === "idle" && (
               <motion.div key="idle">
                 <div
-                  className={`border-2 border-dashed rounded-2xl p-8 ${
+                  className={`relative border-2 border-dashed rounded-2xl p-8 ${
                     dragActive ? "border-primary bg-primary/5" : "border-border"
                   }`}
                   onDragEnter={handleDrag}
@@ -196,17 +276,11 @@ const UploadReport = () => {
               </motion.div>
             )}
 
-            {(uploadState === "uploading" ||
-              uploadState === "processing") && (
-              <motion.div
-                key="progress"
-                className="p-8 text-center border rounded-2xl"
-              >
+            {(uploadState === "uploading" || uploadState === "processing") && (
+              <motion.div key="progress" className="p-8 text-center border rounded-2xl">
                 <Loader2 className="mx-auto animate-spin mb-4 text-primary" />
                 <p className="mb-4">
-                  {uploadState === "uploading"
-                    ? "Uploading..."
-                    : "Analyzing report..."}
+                  {uploadState === "uploading" ? "Uploading..." : "Analyzing report..."}
                 </p>
                 <Progress value={progress} />
                 <p className="mt-2 text-sm">{progress}%</p>
@@ -214,14 +288,12 @@ const UploadReport = () => {
             )}
 
             {uploadState === "complete" && (
-              <motion.div
-                key="complete"
-                className="p-8 text-center border rounded-2xl bg-success/10"
-              >
+              <motion.div key="complete" className="p-8 text-center border rounded-2xl bg-success/10">
                 <CheckCircle className="mx-auto text-success mb-4" size={32} />
                 <p>Analysis complete. Redirecting…</p>
               </motion.div>
             )}
+
           </AnimatePresence>
         </motion.div>
       </main>
