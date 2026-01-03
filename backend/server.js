@@ -2,7 +2,7 @@ import express from "express";
 import mongoose from "mongoose";
 import dotenv from "dotenv";
 import cors from "cors";
-import userRoutes from "./routes/userRoutes.js";
+
 import userRoutes from "./routes/userRoutes.js";
 import reportRoutes from "./routes/reportRoutes.js";
 import prescriptionRoutes from "./routes/prescriptionRoutes.js";
@@ -22,7 +22,7 @@ mongoose.connect(process.env.MONGO_URI)
 
 // API Routes
 app.use("/user", userRoutes);
-app.use("/reports", patientReportsRoutes);
+app.use("/reports", reportRoutes);
 app.use("/prescriptions", prescriptionRoutes);
 
 
