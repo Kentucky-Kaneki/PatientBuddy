@@ -1,12 +1,51 @@
+// models/Report.js
 import mongoose from "mongoose";
 
 const reportSchema = new mongoose.Schema({
-  user: { type: mongoose.Schema.Types.ObjectId, ref: "User" },
-  summary: { type: String, required: true }, // Stores text that will act as vectorDB input
-  keyFindings: { type: String },
-  recommendations: { type: String },
-  createdAt: { type: Date, default: Date.now }  
+  patient: { 
+    type: mongoose.Schema.Types.ObjectId, 
+    ref: 'Patient', 
+    required: true 
+  },
+  fileName: {
+    type: String,
+    required: true
+  },
+  uploadDate: { 
+    type: Date, 
+    default: Date.now 
+  },
+  summary: {
+    type: String,
+    default: ''
+  },
+  keyFindings: {
+    type: String,
+    default: ''
+  },
+  recommendations: {
+    type: String,
+    default: ''
+  },
+  fullText: {
+    type: String,
+    required: true
+  },
+  chunkCount: {
+    type: Number,
+    default: 0
+  },
+  collectionId: {
+    type: String,
+    required: true
+  }
+}, {
+  timestamps: true
 });
+
+// Add indexes for faster queries
+reportSchema.index({ patient: 1, uploadDate: -1 });
+reportSchema.index({ collectionId: 1 });
 
 const Report = mongoose.model("Report", reportSchema);
 export default Report;
