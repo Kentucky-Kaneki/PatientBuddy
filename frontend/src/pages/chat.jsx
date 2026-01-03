@@ -42,12 +42,13 @@ const Chat = () => {
 
   const scrollAreaRef = useRef(null);
   const inputRef = useRef(null);
+  const chatEndRef = useRef(null); // ✅ Add this ref
 
+  /* =============================
+     AUTO SCROLL CHAT
+     ============================= */
   useEffect(() => {
-    if (scrollAreaRef.current) {
-      scrollAreaRef.current.scrollTop =
-        scrollAreaRef.current.scrollHeight;
-    }
+    chatEndRef.current?.scrollIntoView({ behavior: "smooth" });
   }, [messages]);
 
   const handleSend = async () => {
@@ -64,45 +65,46 @@ const Chat = () => {
     setInput("");
     setIsTyping(true);
 
-    await new Promise((resolve) => setTimeout(resolve, 1500));
+    try {
+      const res = await fetch("http://localhost:5050/api/chat", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          userId: "507f1f77bcf86cd799439011", // replace later with auth user
+          message: userMessage.content,
+        }),
+      });
 
-    const aiResponses = {
-      vitamin:
-        "Based on your recent blood test, your Vitamin D level is 18 ng/mL, which is below the optimal range...\n\nWould you like me to explain more?",
-      medicine:
-        "You have 3 medicines prescribed...\n\nWould you like more details about any specific medicine?",
-      food:
-        "Here are some dietary recommendations based on your current medications...\n\nWould you like meal suggestions?",
-      default:
-        "I can help explain any test result, medication, or provide general health information.",
-    };
+      const data = await res.json();
+      
+      console.log("Response:", data);
 
-    const lowerInput = input.toLowerCase();
-    let response = aiResponses.default;
+      if (!res.ok) {
+        throw new Error(data.error || "Server error");
+      }
 
-    if (lowerInput.includes("vitamin")) response = aiResponses.vitamin;
-    else if (
-      lowerInput.includes("medicine") ||
-      lowerInput.includes("take") ||
-      lowerInput.includes("when")
-    )
-      response = aiResponses.medicine;
-    else if (
-      lowerInput.includes("food") ||
-      lowerInput.includes("eat") ||
-      lowerInput.includes("avoid")
-    )
-      response = aiResponses.food;
+      const aiMessage = {
+        id: (Date.now() + 1).toString(),
+        role: "assistant",
+        content: data.answer,
+        timestamp: new Date(),
+      };
 
-    const aiMessage = {
-      id: (Date.now() + 1).toString(),
-      role: "assistant",
-      content: response,
-      timestamp: new Date(),
-    };
-
-    setIsTyping(false);
-    setMessages((prev) => [...prev, aiMessage]);
+      setMessages((prev) => [...prev, aiMessage]);
+    } catch (err) {
+      console.error("Chat error:", err);
+      setMessages((prev) => [
+        ...prev,
+        {
+          id: "error",
+          role: "assistant",
+          content: `Sorry, I couldn't respond right now. Error: ${err.message}`,
+          timestamp: new Date(),
+        },
+      ]);
+    } finally {
+      setIsTyping(false);
+    }
   };
 
   const handleKeyDown = (e) => {
@@ -192,6 +194,28 @@ const Chat = () => {
             ))}
           </AnimatePresence>
 
+          {/* ✅ Typing indicator */}
+          {isTyping && (
+            <motion.div
+              initial={{ opacity: 0, y: 10 }}
+              animate={{ opacity: 1, y: 0 }}
+              className="flex gap-3"
+            >
+              <Avatar className="h-8 w-8">
+                <AvatarFallback>
+                  <Bot className="w-4 h-4" />
+                </AvatarFallback>
+              </Avatar>
+              <div className="p-4 rounded-xl bg-card border">
+                <div className="flex gap-1">
+                  <span className="w-2 h-2 bg-gray-400 rounded-full animate-bounce" style={{ animationDelay: "0ms" }}></span>
+                  <span className="w-2 h-2 bg-gray-400 rounded-full animate-bounce" style={{ animationDelay: "150ms" }}></span>
+                  <span className="w-2 h-2 bg-gray-400 rounded-full animate-bounce" style={{ animationDelay: "300ms" }}></span>
+                </div>
+              </div>
+            </motion.div>
+          )}
+
           {messages.length === 1 && (
             <div>
               <p className="flex items-center gap-2 text-sm">
@@ -202,7 +226,7 @@ const Chat = () => {
                   <button
                     key={i}
                     onClick={() => handleSuggestedQuestion(q)}
-                    className="px-4 py-2 rounded-full border"
+                    className="px-4 py-2 rounded-full border hover:bg-muted transition-colors"
                   >
                     {q}
                   </button>
@@ -210,6 +234,9 @@ const Chat = () => {
               </div>
             </div>
           )}
+
+          {/* ✅ Scroll anchor */}
+          <div ref={chatEndRef} />
         </div>
       </ScrollArea>
 

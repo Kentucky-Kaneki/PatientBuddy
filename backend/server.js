@@ -3,11 +3,15 @@ import mongoose from "mongoose";
 import dotenv from "dotenv";
 import cors from "cors";
 
+dotenv.config();
+
 import userRoutes from "./routes/userRoutes.js";
 import reportRoutes from "./routes/reportRoutes.js";
 import prescriptionRoutes from "./routes/prescriptionRoutes.js";
+import chatRoutes from "./routes/chatRoutes.js";
 
-dotenv.config();
+
+
 const app = express();
 
 app.use(cors());
@@ -23,6 +27,7 @@ app.use((req, res, next) => {
 
 app.use('/api/reports', reportRoutes);
 app.use('/api/patient', userRoutes);
+app.use("/api", chatRoutes);
 
 // Root route
 app.get('/', (req, res) => {

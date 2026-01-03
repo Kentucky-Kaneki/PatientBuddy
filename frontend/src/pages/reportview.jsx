@@ -1,6 +1,7 @@
 import { useEffect, useState, useRef } from "react";
 import { useParams, Link } from "react-router-dom";
 import { motion } from "framer-motion";
+import ReactMarkdown from "react-markdown";
 import {
   ArrowLeft,
   Bot,
@@ -156,9 +157,12 @@ const ReportView = () => {
               )}
 
               {!loadingSummary && !error && (
-                <pre className="whitespace-pre-wrap text-sm text-foreground bg-muted p-4 rounded-lg">
-                  {summary}
-                </pre>
+                <div className="max-w-none bg-muted p-6 rounded-lg text-sm whitespace-pre-wrap">
+  <ReactMarkdown>
+    {summary}
+  </ReactMarkdown>
+</div>
+
               )}
             </CardContent>
           </Card>
