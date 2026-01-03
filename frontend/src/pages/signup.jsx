@@ -8,6 +8,7 @@ import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Checkbox } from "@/components/ui/checkbox";
 import { useToast } from "@/hooks/use-toast";
+import { useAuth } from "@/context/AuthContext";
 
 const Signup = () => {
   const [showPassword, setShowPassword] = useState(false);
@@ -20,6 +21,7 @@ const Signup = () => {
     password: "",
   });
   const { toast } = useToast();
+  const { signup } = useAuth();
 
   const handleInputChange = (e) => {
     const { id, value } = e.target;
@@ -43,23 +45,10 @@ const Signup = () => {
 
     setIsLoading(true);
 
-    try {      
-      const response = await fetch("http://localhost:5050/api/patient/signup", {
-        method: "POST",
-        headers: {
-          "Content-Type": "application/json",
-        },
-        body: JSON.stringify(formData),
-      });
-      
-      if (response.ok) {
-        const data = await response.json();
-    
-        // Store token
-        if (data.token) {
-          localStorage.setItem('token', data.token);
-        }
-        
+    try {
+      const result = await signup(formData.name, formData.email, formData.password);
+
+      if (result.success) {
         toast({
           title: "Account Created!",
           description: "Welcome to MediClear. Let's get started!",
@@ -67,19 +56,17 @@ const Signup = () => {
         
         // Reset form
         setFormData({
-          firstName: "",
-          lastName: "",
+          name: "",
           email: "",
           phone: "",
           password: "",
         });
-
-        // Navigate to dashboard
-        window.location.href = "/dashboard";
+        setAcceptTerms(false);
+        // Navigation is handled by AuthContext
       } else {
         toast({
           title: "Signup Failed",
-          description: "Please try again.",
+          description: result.error || "Please try again.",
           variant: "destructive",
         });
       }
@@ -121,20 +108,18 @@ const Signup = () => {
           </p>
 
           <form onSubmit={handleSubmit} className="space-y-4">
-            <div className="grid grid-cols-1 gap-4">
-              <div className="space-y-2">
-                <Label htmlFor="name">Name</Label>
-                <div className="relative">
-                  <User className="absolute left-3 top-1/2 -translate-y-1/2 w-5 h-5 text-muted-foreground" />
-                  <Input
-                    id="name"
-                    value={formData.name}
-                    onChange={handleInputChange}
-                    placeholder="John Doe"
-                    className="pl-10 h-12 rounded-xl"
-                    required
-                  />
-                </div>
+            <div className="space-y-2">
+              <Label htmlFor="name">Full Name</Label>
+              <div className="relative">
+                <User className="absolute left-3 top-1/2 -translate-y-1/2 w-5 h-5 text-muted-foreground" />
+                <Input
+                  id="name"
+                  value={formData.name}
+                  onChange={handleInputChange}
+                  placeholder="John Doe"
+                  className="pl-10 h-12 rounded-xl"
+                  required
+                />
               </div>
             </div>
 
