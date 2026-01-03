@@ -1,10 +1,9 @@
-import { createRoot } from 'react-dom/client'
-import { BrowserRouter } from "react-router-dom";
-import PrescriptionReader from "./components/PrescriptionReader.jsx";
-// import './index.css'
-// import App from './App.jsx'
-import MedicalRAGClient from "./components/MedicalRAGClient";
+import { createRoot } from "react-dom/client";
+import App from "./App";
+import "./index.css";
 
-createRoot(document.getElementById('root')).render(
-    <PrescriptionReader />
-)
+const root = document.getElementById("root");
+
+if (root) {
+  createRoot(root).render(<App />);
+}

@@ -14,12 +14,24 @@ from sentence_transformers import SentenceTransformer
 import faiss
 from dotenv import load_dotenv
 
+<<<<<<< Updated upstream
 # ================= LOAD ENV =================
+=======
+import platform
+import shutil
+import pytesseract
+
+
+
+>>>>>>> Stashed changes
 BASE_DIR = os.path.dirname(os.path.abspath(__file__))
 load_dotenv(os.path.join(BASE_DIR, ".env"))
 
 # ================= TESSERACT PATH =================
-pytesseract.pytesseract.tesseract_cmd = r"C:\Program Files\Tesseract-OCR\tesseract.exe"
+if platform.system() == "Windows":
+    pytesseract.pytesseract.tesseract_cmd = r"C:\Program Files\Tesseract-OCR\tesseract.exe"
+else:
+    pytesseract.pytesseract.tesseract_cmd = shutil.which("tesseract")
 
 # ================= APP =================
 app = FastAPI()
