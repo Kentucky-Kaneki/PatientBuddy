@@ -141,19 +141,6 @@ const Chat = () => {
         </div>
       </header>
 
-      {/* Context Bar */}
-      <div className="px-4 py-2 border-b bg-muted/30">
-        <div className="flex gap-3 text-xs">
-          <span>Active context:</span>
-          <span className="flex items-center gap-1">
-            <FileText className="w-3 h-3" /> Blood Test
-          </span>
-          <span className="flex items-center gap-1">
-            <Pill className="w-3 h-3" /> Prescription
-          </span>
-        </div>
-      </div>
-
       {/* Messages */}
       <ScrollArea className="flex-1 px-4" ref={scrollAreaRef}>
         <div className="max-w-3xl mx-auto py-6 space-y-6">
@@ -243,9 +230,6 @@ const Chat = () => {
       {/* Input */}
       <div className="border-t p-4">
         <div className="max-w-3xl mx-auto flex gap-3">
-          <Button variant="ghost" size="icon">
-            <Paperclip />
-          </Button>
 
           <Input
             ref={inputRef}

@@ -1,7 +1,7 @@
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import { Link } from "react-router-dom";
 import { motion } from "framer-motion";
-import { FileText, LogOut, Pill, MessageCircle, History, Users, Plus, Upload, TrendingUp, Bell, Settings, Heart, ChevronRight, Calendar, AlertCircle } from "lucide-react";
+import { FileText, LogOut, Pill, MessageCircle, History, Users, Plus, Upload, TrendingUp, Bell, Settings, Heart, ChevronRight, Calendar, AlertCircle, CheckCircle, Info } from "lucide-react";
 
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
@@ -38,30 +38,6 @@ const quickActions = [
   },
 ];
 
-const recentActivity = [
-  {
-    type: "report",
-    title: "Blood Test Report",
-    date: "Dec 28, 2024",
-    status: "analyzed",
-    statusColor: "text-success",
-  },
-  {
-    type: "prescription",
-    title: "Dr. Smith Prescription",
-    date: "Dec 25, 2024",
-    status: "analyzed",
-    statusColor: "text-success",
-  },
-  {
-    type: "report",
-    title: "Thyroid Panel",
-    date: "Dec 20, 2024",
-    status: "needs attention",
-    statusColor: "text-warning",
-  },
-];
-
 const familyMembers = [
   { name: "You", initials: "JD", color: "bg-primary" },
   { name: "Sarah", initials: "SD", color: "bg-info" },
@@ -70,6 +46,136 @@ const familyMembers = [
 
 const Dashboard = () => {
   const [selectedMember, setSelectedMember] = useState("You");
+  const [healthInsights, setHealthInsights] = useState([]);
+  const [recentActivity, setRecentActivity] = useState([]);
+  const [healthTrends, setHealthTrends] = useState([]);
+  const [loading, setLoading] = useState(true);
+
+  const userId = "507f1f77bcf86cd799439011"; // Replace with actual user ID from auth
+
+  useEffect(() => {
+    fetchDashboardData();
+  }, [selectedMember]);
+
+  const fetchDashboardData = async () => {
+    setLoading(true);
+    try {
+      // Fetch health insights
+      const insightsRes = await fetch(`http://localhost:5050/api/insights/${userId}/insights`);
+      const insightsData = await insightsRes.json();
+      if (insightsData.success) {
+        setHealthInsights(insightsData.insights);
+      }
+
+      // Fetch recent reports for activity
+      const reportsRes = await fetch(`http://localhost:5050/api/reports/patient/${userId}`);
+      const reportsData = await reportsRes.json();
+      if (reportsData.success) {
+        const activities = reportsData.reports.slice(0, 3).map(report => ({
+          type: "report",
+          title: report.reportType || "Medical Report",
+          date: new Date(report.uploadDate).toLocaleDateString('en-US', { 
+            month: 'short', 
+            day: 'numeric', 
+            year: 'numeric' 
+          }),
+          status: report.summary ? "analyzed" : "processing",
+          statusColor: report.summary ? "text-success" : "text-warning",
+          id: report._id,
+        }));
+        setRecentActivity(activities);
+
+        // Extract trends from reports
+        extractHealthTrends(reportsData.reports);
+      }
+    } catch (error) {
+      console.error("Failed to fetch dashboard data:", error);
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  const extractHealthTrends = (reports) => {
+    const trends = [];
+    
+    // Analyze reports for trends (this is a simple example)
+    reports.forEach(report => {
+      const findings = (report.keyFindings || "").toLowerCase();
+      
+      if (findings.includes('hemoglobin')) {
+        if (!trends.find(t => t.metric === 'Hemoglobin')) {
+          trends.push({
+            metric: 'Hemoglobin',
+            status: findings.includes('improved') || findings.includes('normal') ? 'improved' : 'stable',
+            color: findings.includes('improved') || findings.includes('normal') ? 'success' : 'warning',
+            icon: '↑',
+          });
+        }
+      }
+      
+      if (findings.includes('vitamin d')) {
+        if (!trends.find(t => t.metric === 'Vitamin D')) {
+          trends.push({
+            metric: 'Vitamin D',
+            status: findings.includes('low') || findings.includes('deficient') ? 'stable-low' : 'improved',
+            color: findings.includes('low') || findings.includes('deficient') ? 'warning' : 'success',
+            icon: '→',
+          });
+        }
+      }
+      
+      if (findings.includes('cholesterol')) {
+        if (!trends.find(t => t.metric === 'Cholesterol')) {
+          trends.push({
+            metric: 'Cholesterol',
+            status: findings.includes('reduced') || findings.includes('normal') ? 'reduced' : 'stable',
+            color: findings.includes('reduced') || findings.includes('normal') ? 'success' : 'warning',
+            icon: '↓',
+          });
+        }
+      }
+    });
+
+    setHealthTrends(trends.slice(0, 3));
+  };
+
+  const getInsightIcon = (type) => {
+    switch (type) {
+      case 'warning':
+        return AlertCircle;
+      case 'attention':
+        return AlertCircle;
+      case 'success':
+        return CheckCircle;
+      default:
+        return Info;
+    }
+  };
+
+  const getInsightStyle = (type) => {
+    switch (type) {
+      case 'warning':
+        return {
+          card: 'border-warning/30 bg-warning/5',
+          icon: 'bg-warning/20 text-warning',
+        };
+      case 'attention':
+        return {
+          card: 'border-orange-500/30 bg-orange-500/5',
+          icon: 'bg-orange-500/20 text-orange-500',
+        };
+      case 'success':
+        return {
+          card: 'border-success/30 bg-success/5',
+          icon: 'bg-success/20 text-success',
+        };
+      default:
+        return {
+          card: 'border-info/30 bg-info/5',
+          icon: 'bg-info/20 text-info',
+        };
+    }
+  };
 
   const handleLogout = () => {
     localStorage.removeItem('token');
@@ -159,62 +265,110 @@ const Dashboard = () => {
                   </Button>
                 </Link>
               </div>
-              <Card className="border-border">
-                <CardContent className="p-0 divide-y divide-border">
-                  {recentActivity.map((item, index) => (
-                    <Link 
-                      key={index} 
-                      to={item.type === "report" ? "/report/1" : "/prescription/1"}
-                      className="flex items-center gap-4 p-4 hover:bg-muted/50 transition-colors"
-                    >
-                      <div className={`w-10 h-10 rounded-lg ${item.type === "report" ? "bg-primary/10" : "bg-success/10"} flex items-center justify-center`}>
-                        {item.type === "report" ? (
-                          <FileText className="w-5 h-5 text-primary" />
-                        ) : (
-                          <Pill className="w-5 h-5 text-success" />
-                        )}
-                      </div>
-                      <div className="flex-1">
-                        <h3 className="font-medium text-foreground">{item.title}</h3>
-                        <div className="flex items-center gap-2 text-sm">
-                          <Calendar className="w-3 h-3 text-muted-foreground" />
-                          <span className="text-muted-foreground">{item.date}</span>
-                          <span className={`${item.statusColor} font-medium`}>• {item.status}</span>
+              
+              {loading ? (
+                <Card className="border-border">
+                  <CardContent className="p-8 text-center">
+                    <div className="animate-pulse space-y-4">
+                      <div className="h-12 bg-muted rounded"></div>
+                      <div className="h-12 bg-muted rounded"></div>
+                      <div className="h-12 bg-muted rounded"></div>
+                    </div>
+                  </CardContent>
+                </Card>
+              ) : recentActivity.length > 0 ? (
+                <Card className="border-border">
+                  <CardContent className="p-0 divide-y divide-border">
+                    {recentActivity.map((item, index) => (
+                      <Link 
+                        key={index} 
+                        to={`/report/${item.id}`}
+                        className="flex items-center gap-4 p-4 hover:bg-muted/50 transition-colors"
+                      >
+                        <div className={`w-10 h-10 rounded-lg ${item.type === "report" ? "bg-primary/10" : "bg-success/10"} flex items-center justify-center`}>
+                          {item.type === "report" ? (
+                            <FileText className="w-5 h-5 text-primary" />
+                          ) : (
+                            <Pill className="w-5 h-5 text-success" />
+                          )}
                         </div>
-                      </div>
-                      <ChevronRight className="w-5 h-5 text-muted-foreground" />
-                    </Link>
-                  ))}
-                </CardContent>
-              </Card>
+                        <div className="flex-1">
+                          <h3 className="font-medium text-foreground">{item.title}</h3>
+                          <div className="flex items-center gap-2 text-sm">
+                            <Calendar className="w-3 h-3 text-muted-foreground" />
+                            <span className="text-muted-foreground">{item.date}</span>
+                            <span className={`${item.statusColor} font-medium`}>• {item.status}</span>
+                          </div>
+                        </div>
+                        <ChevronRight className="w-5 h-5 text-muted-foreground" />
+                      </Link>
+                    ))}
+                  </CardContent>
+                </Card>
+              ) : (
+                <Card className="border-border">
+                  <CardContent className="p-8 text-center">
+                    <FileText className="w-12 h-12 text-muted-foreground mx-auto mb-3" />
+                    <p className="text-muted-foreground">No recent activity</p>
+                    <p className="text-sm text-muted-foreground mt-1">Upload your first report to get started</p>
+                  </CardContent>
+                </Card>
+              )}
             </motion.div>
 
-            {/* Health Insight Card */}
+            {/* Health Insights - Dynamic */}
             <motion.div
               initial={{ opacity: 0, y: 20 }}
               animate={{ opacity: 1, y: 0 }}
               transition={{ delay: 0.3 }}
+              className="space-y-4"
             >
-              <Card className="border-warning/30 bg-warning/5">
-                <CardContent className="p-5 flex items-start gap-4">
-                  <div className="w-10 h-10 rounded-lg bg-warning/20 flex items-center justify-center flex-shrink-0">
-                    <AlertCircle className="w-5 h-5 text-warning" />
-                  </div>
-                  <div>
-                    <h3 className="font-semibold text-foreground mb-1">Health Insight</h3>
-                    <p className="text-sm text-muted-foreground mb-3">
-                      Your Vitamin D levels from your last test were below optimal range. 
-                      Consider discussing supplementation with your healthcare provider.
-                    </p>
-                    <Link to="/chat">
-                      <Button variant="soft" size="sm">
-                        Ask AI About This
-                        <MessageCircle className="w-4 h-4 ml-1" />
-                      </Button>
-                    </Link>
-                  </div>
-                </CardContent>
-              </Card>
+              {loading ? (
+                <Card className="border-border">
+                  <CardContent className="p-6">
+                    <div className="animate-pulse space-y-3">
+                      <div className="h-4 bg-muted rounded w-3/4"></div>
+                      <div className="h-4 bg-muted rounded w-full"></div>
+                      <div className="h-4 bg-muted rounded w-5/6"></div>
+                    </div>
+                  </CardContent>
+                </Card>
+              ) : healthInsights.length > 0 ? (
+                healthInsights.map((insight, index) => {
+                  const InsightIcon = getInsightIcon(insight.type);
+                  const styles = getInsightStyle(insight.type);
+                  
+                  return (
+                    <Card key={index} className={styles.card}>
+                      <CardContent className="p-5 flex items-start gap-4">
+                        <div className={`w-10 h-10 rounded-lg ${styles.icon} flex items-center justify-center flex-shrink-0`}>
+                          <InsightIcon className="w-5 h-5" />
+                        </div>
+                        <div className="flex-1">
+                          <h3 className="font-semibold text-foreground mb-1">{insight.title}</h3>
+                          <p className="text-sm text-muted-foreground mb-3">
+                            {insight.message}
+                          </p>
+                          <Link to="/chat">
+                            <Button variant="soft" size="sm">
+                              Ask AI About This
+                              <MessageCircle className="w-4 h-4 ml-1" />
+                            </Button>
+                          </Link>
+                        </div>
+                      </CardContent>
+                    </Card>
+                  );
+                })
+              ) : (
+                <Card className="border-dashed border-2 border-border">
+                  <CardContent className="p-6 text-center">
+                    <Info className="w-12 h-12 text-muted-foreground mx-auto mb-3" />
+                    <p className="text-muted-foreground">No health insights yet</p>
+                    <p className="text-sm text-muted-foreground mt-1">Upload a medical report to get personalized insights</p>
+                  </CardContent>
+                </Card>
+              )}
             </motion.div>
           </div>
 
@@ -264,7 +418,7 @@ const Dashboard = () => {
               </Card>
             </motion.div>
 
-            {/* Health Trends */}
+            {/* Health Trends - Dynamic */}
             <motion.div
               initial={{ opacity: 0, x: 20 }}
               animate={{ opacity: 1, x: 0 }}
@@ -278,23 +432,34 @@ const Dashboard = () => {
                   </div>
                 </CardHeader>
                 <CardContent className="space-y-4">
-                  <div className="flex items-center justify-between p-3 rounded-xl bg-success/10">
-                    <span className="text-sm font-medium text-foreground">Hemoglobin</span>
-                    <span className="text-sm text-success font-medium">↑ Improved</span>
-                  </div>
-                  <div className="flex items-center justify-between p-3 rounded-xl bg-warning/10">
-                    <span className="text-sm font-medium text-foreground">Vitamin D</span>
-                    <span className="text-sm text-warning font-medium">→ Stable (Low)</span>
-                  </div>
-                  <div className="flex items-center justify-between p-3 rounded-xl bg-success/10">
-                    <span className="text-sm font-medium text-foreground">Cholesterol</span>
-                    <span className="text-sm text-success font-medium">↓ Reduced</span>
-                  </div>
-                  <Link to="/history">
-                    <Button variant="outline" size="sm" className="w-full mt-2">
-                      View Full Timeline
-                    </Button>
-                  </Link>
+                  {loading ? (
+                    <div className="animate-pulse space-y-3">
+                      <div className="h-12 bg-muted rounded-xl"></div>
+                      <div className="h-12 bg-muted rounded-xl"></div>
+                      <div className="h-12 bg-muted rounded-xl"></div>
+                    </div>
+                  ) : healthTrends.length > 0 ? (
+                    <>
+                      {healthTrends.map((trend, index) => (
+                        <div key={index} className={`flex items-center justify-between p-3 rounded-xl bg-${trend.color}/10`}>
+                          <span className="text-sm font-medium text-foreground">{trend.metric}</span>
+                          <span className={`text-sm text-${trend.color} font-medium`}>
+                            {trend.icon} {trend.status === 'stable-low' ? 'Stable (Low)' : trend.status.charAt(0).toUpperCase() + trend.status.slice(1)}
+                          </span>
+                        </div>
+                      ))}
+                      <Link to="/history">
+                        <Button variant="outline" size="sm" className="w-full mt-2">
+                          View Full Timeline
+                        </Button>
+                      </Link>
+                    </>
+                  ) : (
+                    <div className="text-center py-4">
+                      <TrendingUp className="w-10 h-10 text-muted-foreground mx-auto mb-2" />
+                      <p className="text-sm text-muted-foreground">No trends available yet</p>
+                    </div>
+                  )}
                 </CardContent>
               </Card>
             </motion.div>

@@ -2,7 +2,6 @@ import { useEffect, useState, useRef } from "react";
 import { useParams, Link } from "react-router-dom";
 import { motion } from "framer-motion";
 import ReactMarkdown from "react-markdown";
-import ReactMarkdown from "react-markdown";
 import {
   ArrowLeft,
   Bot,
