@@ -2,7 +2,6 @@ import { useState, useEffect } from "react";
 import { useNavigate } from "react-router-dom";
 import { Link } from "react-router-dom";
 import { motion } from "framer-motion";
-import { useAuth } from "../context/AuthContext";
 import {
   FileText, LogOut, Pill, MessageCircle, History,
   Plus, Upload, TrendingUp, User, Heart, ChevronRight,
@@ -12,6 +11,8 @@ import {
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
+
+import AddFamilyMemberModal from "@/components/AddFamilyMemberModal";
 
 const Dashboard = () => {
   const [user, setUser] = useState(null);
@@ -23,6 +24,8 @@ const Dashboard = () => {
   const [recentActivity, setRecentActivity] = useState([]);
   const [healthInsight, setHealthInsight] = useState(null);
   const [healthTrends, setHealthTrends] = useState([]);
+
+   const [isModalOpen, setIsModalOpen] = useState(false);
   const [isLoading, setIsLoading] = useState(true);
   const [error, setError] = useState(null);
 
@@ -69,7 +72,7 @@ const Dashboard = () => {
     fetchUserData();
   }, []);
 
-  /* ---------- FETCH DATA ---------- */
+  /* ---------- FETCH ACTIVITY DATA ---------- */
   useEffect(() => {
     if (!selectedMember) return;
 
@@ -335,14 +338,12 @@ const Dashboard = () => {
               <Card className="border-border">
                 <CardHeader className="pb-3">
                   <div className="flex items-center justify-between">
-                    <CardTitle className="text-lg">Family Profiles</CardTitle>
-                    <Link to="/family">
-                      <Button variant="ghost" size="icon-sm">
+                    <CardTitle className="text-lg">Member Profiles</CardTitle>
+                      <Button variant="ghost" size="icon-sm"  onClick={() => setIsModalOpen(true)}>
                         <Plus className="w-4 h-4" />
                       </Button>
-                    </Link>
                   </div>
-                  <CardDescription>Switch between family members</CardDescription>
+                  <CardDescription>Switch between members</CardDescription>
                 </CardHeader>
                 <CardContent className="space-y-2">
                   {members.map((member) => (                   
@@ -410,6 +411,11 @@ const Dashboard = () => {
           </Card>
         </div>
       </main>
+      <AddFamilyMemberModal
+        isOpen={isModalOpen}
+        onClose={() => setIsModalOpen(false)}
+        userId={user._id}
+      />
     </div>
   );
 };

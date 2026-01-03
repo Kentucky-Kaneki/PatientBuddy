@@ -105,3 +105,37 @@ export const signin = async (req, res) => {
     res.status(500).json({ message: "Server error", error: err.message });
   }
 };
+
+export const addFamilyMember = async (req, res) => {
+  try {
+    const { userId } = req.params;
+    const { name } = req.body;
+
+    const user = await User.findById(userId);
+    
+    if (!user) {
+      return res.status(404).json({
+        success: false,
+        error: "User not found",
+      });
+    }
+
+    const newMember= new Member({ name });
+    await newMember.save();
+
+    user.members.push(newMember._id);
+    await user.save();
+
+    res.json({
+      success: true,
+      message: "Member added successfully",
+      member: user.members[user.members.length - 1],
+    });
+  } catch (err) {
+    console.error("Add family member error:", err);
+    res.status(500).json({
+      success: false,
+      error: "Internal server error",
+    });
+  }
+};

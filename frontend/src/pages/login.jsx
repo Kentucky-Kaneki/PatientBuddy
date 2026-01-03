@@ -1,4 +1,5 @@
 import { useState, useEffect } from "react";
+import { useNavigate } from "react-router-dom";
 import { Link } from "react-router-dom";
 import { motion } from "framer-motion";
 import { Heart, Mail, Lock, Eye, EyeOff, ArrowRight } from "lucide-react";
@@ -6,7 +7,6 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { useToast } from "@/hooks/use-toast";
-import { useAuth } from "@/context/AuthContext";
 
 const Login = () => {
   const [email, setEmail] = useState("");
@@ -14,35 +14,48 @@ const Login = () => {
   const [showPassword, setShowPassword] = useState(false);
   const [isLoading, setIsLoading] = useState(false);
   const { toast } = useToast();
-  const { login, user } = useAuth();
+  const navigate = useNavigate();
 
   // Auto-redirect if already logged in
   useEffect(() => {
-    if (user) {
-      window.location.href = "/dashboard";
+    const token = localStorage.getItem("token");
+    if (token) {
+     navigate("/dashboard", { replace: true });
     }
-  }, [user]);
+  }, []);
 
   const handleSubmit = async (e) => {
     e.preventDefault();
     setIsLoading(true);
 
-    try {
-      const result = await login(email, password);
+    try {  
+      const response = await fetch("http://localhost:5050/api/patient/signin", {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json", 
+        },
+        body: JSON.stringify({ email, password }), 
+      });
 
-      if (result.success) {
-        toast({
-          title: "Welcome back!",
-          description: "You have been successfully logged in.",
-        });
-        // Navigation is handled by AuthContext
-      } else {
+      if (response.status === 404) {
         toast({
           title: "Login Failed",
-          description: result.error || "Invalid email or password. Please try again.",
-          variant: "destructive",
+          description: "Invalid email or password. Please try again."
         });
+        return;
       }
+
+      const data = await response.json();
+
+      localStorage.setItem("token", data.token);
+
+      toast({
+        title: "Welcome back!",
+        description: "You have been successfully logged in.",
+      });
+
+    // Navigate to dashboard
+    navigate("/dashboard", { replace: true });
     } catch (error) {
       console.error(error);
       toast({
@@ -53,7 +66,7 @@ const Login = () => {
     } finally {
       setIsLoading(false);
     }
-  };
+  }
 
   return (
     <div className="min-h-screen gradient-hero flex items-center justify-center p-4">

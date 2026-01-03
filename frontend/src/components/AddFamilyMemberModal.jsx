@@ -3,12 +3,9 @@ import { X, User } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 
-const AddFamilyMemberModal = ({ isOpen, onClose, onAdd }) => {
+const AddFamilyMemberModal = ({ isOpen, onClose, userId }) => {
   const [formData, setFormData] = useState({
-    name: "",
-    relationship: "Child",
-    dateOfBirth: "",
-    gender: "Male",
+    name: ""
   });
   const [loading, setLoading] = useState(false);
 
@@ -19,13 +16,13 @@ const AddFamilyMemberModal = ({ isOpen, onClose, onAdd }) => {
     setLoading(true);
     
     try {
-      await onAdd(formData);
-      setFormData({
-        name: "",
-        relationship: "Child",
-        dateOfBirth: "",
-        gender: "Male",
-      });
+      const response = await fetch(`http://localhost:5050/api/patient/${userId}/addmember`, {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+        },
+        body: JSON.stringify(formData),
+      }); 
       onClose();
     } catch (error) {
       console.error("Failed to add family member:", error);
@@ -51,8 +48,7 @@ const AddFamilyMemberModal = ({ isOpen, onClose, onAdd }) => {
               <User className="w-5 h-5 text-primary" />
             </div>
             <div>
-              <h2 className="text-xl font-semibold text-foreground">Add Family Member</h2>
-              <p className="text-sm text-muted-foreground">Create a new family profile</p>
+              <h2 className="text-xl font-semibold text-foreground">Add Member</h2>
             </div>
           </div>
           <button
@@ -79,57 +75,6 @@ const AddFamilyMemberModal = ({ isOpen, onClose, onAdd }) => {
               required
               className="w-full"
             />
-          </div>
-
-          {/* Relationship */}
-          <div>
-            <label className="block text-sm font-medium text-foreground mb-2">
-              Relationship *
-            </label>
-            <select
-              name="relationship"
-              value={formData.relationship}
-              onChange={handleChange}
-              required
-              className="w-full px-3 py-2 border border-border rounded-lg bg-background text-foreground focus:outline-none focus:ring-2 focus:ring-primary"
-            >
-              <option value="Spouse">Spouse</option>
-              <option value="Child">Child</option>
-              <option value="Parent">Parent</option>
-              <option value="Sibling">Sibling</option>
-              <option value="Other">Other</option>
-            </select>
-          </div>
-
-          {/* Date of Birth */}
-          <div>
-            <label className="block text-sm font-medium text-foreground mb-2">
-              Date of Birth
-            </label>
-            <Input
-              type="date"
-              name="dateOfBirth"
-              value={formData.dateOfBirth}
-              onChange={handleChange}
-              className="w-full"
-            />
-          </div>
-
-          {/* Gender */}
-          <div>
-            <label className="block text-sm font-medium text-foreground mb-2">
-              Gender
-            </label>
-            <select
-              name="gender"
-              value={formData.gender}
-              onChange={handleChange}
-              className="w-full px-3 py-2 border border-border rounded-lg bg-background text-foreground focus:outline-none focus:ring-2 focus:ring-primary"
-            >
-              <option value="Male">Male</option>
-              <option value="Female">Female</option>
-              <option value="Other">Other</option>
-            </select>
           </div>
 
           {/* Actions */}
