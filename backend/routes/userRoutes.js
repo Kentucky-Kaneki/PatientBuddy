@@ -6,9 +6,5 @@ const router = express.Router();
 router.post("/signup", signup);
 router.post("/signin", signin);
 router.get("/", getUserInfo)
-// Patient reports route
-// router.get('/patients/:patientId/reports', getPatientReports);
-// Health check route
-// router.get('/health', healthCheck);
 
 export default router;

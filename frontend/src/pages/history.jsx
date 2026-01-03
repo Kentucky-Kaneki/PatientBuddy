@@ -4,14 +4,7 @@ import { Link } from "react-router-dom";
 import { motion } from "framer-motion";
 import axios from "axios";
 
-import {
-  ArrowLeft,
-  FileText,
-  Pill,
-  Search,
-  ChevronRight,
-  Heart,
-} from "lucide-react";
+import { ArrowLeft, FileText, Pill, Search, ChevronRight, Heart } from "lucide-react";
 
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";

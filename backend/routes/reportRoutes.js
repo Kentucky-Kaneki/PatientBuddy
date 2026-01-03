@@ -14,6 +14,7 @@ router.post('/:reportId/summarize', summarizeReport);
 router.get('/:reportId', getReport);
 router.delete('/:reportId', deleteReport);
 
-
+// router.get('/patients/:patientId/reports', getPatientReports);
+// router.get('/health', healthCheck);
 
 export default router;

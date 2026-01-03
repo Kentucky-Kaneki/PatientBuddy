@@ -1,4 +1,4 @@
-import { useState, useEffect, useEffect } from "react";
+import { useState, useEffect } from "react";
 import { useNavigate } from "react-router-dom";
 import { Link } from "react-router-dom";
 import { motion } from "framer-motion";
@@ -7,41 +7,6 @@ import { FileText, LogOut, Pill, MessageCircle, History, Users, Plus, Upload, Tr
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
-
-import UploadReport from "../pages/uploadreport";
-import Chat from "../pages/chat";
-import History from "../pages/history";
-
-const quickActions = [
-  {
-    icon: FileText,
-    title: "Upload Report",
-    description: "Medical or lab report",
-    href: "/upload/report",
-    color: "bg-primary/10 text-primary",
-  },
-  {
-    icon: Pill,
-    title: "Upload Prescription",
-    description: "Handwritten or printed",
-    href: "/upload/prescription",
-    color: "bg-success/10 text-success",
-  },
-  {
-    icon: MessageCircle,
-    title: "AI Assistant",
-    description: "Ask health questions",
-    href: "/chat",
-    color: "bg-info/10 text-info",
-  },
-  {
-    icon: Clock,
-    title: "View History",
-    description: "Past reports & trends",
-    href: "/history",
-    color: "bg-warning/10 text-warning",
-  },
-];
 
 const Dashboard = () => {
   const [user, setUser] = useState(null);
@@ -54,6 +19,49 @@ const Dashboard = () => {
   const [recentActivity, setRecentActivity] = useState([]);
   const [healthTrends, setHealthTrends] = useState([]);
   const [loading, setLoading] = useState(true);
+
+  const handleLogout = () => {
+    localStorage.removeItem('token');
+    navigate("/dashboard", { replace: true });
+  };
+
+  // fetch user and members data
+  useEffect(() => {
+    const fetchUserData = async () => {
+      try {
+        setIsLoading(true);
+        const token = localStorage.getItem('token');
+        if (!token) {
+          setError('No token found. Please login.');
+          return;
+        }
+        
+        const response = await fetch('http://localhost:5050/api/patient/', {
+          method: 'GET',
+          headers: {
+            'Authorization': `Bearer ${token}`,
+            'Content-Type': 'application/json',
+          },
+        });
+
+        if (!response.ok) {
+          throw new Error('Failed to fetch user data');
+        }
+
+        const data = await response.json();
+        
+        setUser(data.user);
+        setMembers(data.user.members || []);
+        setSelectedMember(data.user.members[0]._id)  // Populated members array
+      } catch (err) {
+        setError(err.message);
+      } finally {
+        setIsLoading(false);
+      }
+    };
+
+    fetchUserData();
+  }, []);
 
   const userId = "507f1f77bcf86cd799439011"; // Replace with actual user ID from auth
 
@@ -180,49 +188,6 @@ const Dashboard = () => {
         };
     }
   };
-
-  const handleLogout = () => {
-    localStorage.removeItem('token');
-    navigate("/dashboard", { replace: true });
-  };
-
-  // fetch user and members data
-  useEffect(() => {
-    const fetchUserData = async () => {
-      try {
-        setIsLoading(true);
-        const token = localStorage.getItem('token');
-        if (!token) {
-          setError('No token found. Please login.');
-          return;
-        }
-        
-        const response = await fetch('http://localhost:5050/api/patient/', {
-          method: 'GET',
-          headers: {
-            'Authorization': `Bearer ${token}`,
-            'Content-Type': 'application/json',
-          },
-        });
-
-        if (!response.ok) {
-          throw new Error('Failed to fetch user data');
-        }
-
-        const data = await response.json();
-        
-        setUser(data.user);
-        setMembers(data.user.members || []);
-        setSelectedMember(data.user.members[0]._id)  // Populated members array
-      } catch (err) {
-        setError(err.message);
-      } finally {
-        setIsLoading(false);
-      }
-    };
-
-    fetchUserData();
-  }, []);
 
   if (isLoading) return <div className="loading">Loading dashboard...</div>;
   if (error) return <div className="error">Error: {error}</div>;
