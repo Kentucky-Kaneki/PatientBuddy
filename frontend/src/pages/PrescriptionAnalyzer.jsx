@@ -16,8 +16,10 @@ import {
   Coffee,
   AlertTriangle,
   ChevronRight,
-  Info,
 } from "lucide-react";
+
+// API Base URL - change this if your backend runs on different port
+const API_BASE_URL = "http://127.0.0.1:8000";
 
 const Button = ({ children, variant = "default", size = "default", className = "", onClick, disabled }) => {
   const baseStyles = "inline-flex items-center justify-center rounded-lg font-medium transition-colors";
@@ -186,7 +188,7 @@ const PrescriptionAnalyzer = () => {
         });
       }, 100);
 
-      const res = await fetch("http://127.0.0.1:8000/upload", {
+      const res = await fetch(`${API_BASE_URL}/upload`, {
         method: "POST",
         body: formData,
       });
@@ -210,7 +212,7 @@ const PrescriptionAnalyzer = () => {
 
     } catch (err) {
       console.error("UPLOAD ERROR:", err);
-      alert(`Upload failed: ${err.message}`);
+      alert(`Upload failed: ${err.message}\n\nMake sure backend is running on ${API_BASE_URL}`);
       setUploadState("idle");
       setProgress(0);
     }
@@ -237,7 +239,7 @@ const PrescriptionAnalyzer = () => {
 
     try {
       const res = await fetch(
-        `http://127.0.0.1:8000/medicine/${encodeURIComponent(medicineName)}`
+        `${API_BASE_URL}/medicine/${encodeURIComponent(medicineName)}`
       );
 
       if (!res.ok) {
@@ -402,8 +404,6 @@ const PrescriptionAnalyzer = () => {
                   New Upload
                 </Button>
               </div>
-
-
 
               {/* Medicines */}
               {medicines.length > 0 ? (
