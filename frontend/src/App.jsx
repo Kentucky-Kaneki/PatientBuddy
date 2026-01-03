@@ -8,6 +8,7 @@ import Login from "./pages/login";
 import Signup from "./pages/signup";
 import Dashboard from "./pages/dashboard";
 import UploadReport from "./pages/uploadreport";
+import PrescriptionAnalyzer from "./pages/PrescriptionAnalyzer";
 import ReportView from "./pages/reportview";
 import PrescriptionView from "./pages/prescriptionview";
 import Chat from "./pages/chat";
@@ -28,7 +29,7 @@ const App = () => (
           <Route path="/signup" element={<Signup />} />
           <Route path="/dashboard" element={<Dashboard />} />
           <Route path="/upload/report" element={<UploadReport />} />
-          <Route path="/upload/prescription" element={<UploadReport />} />
+          <Route path="/upload/prescription" element={<PrescriptionAnalyzer />} />
           <Route path="/report/:id" element={<ReportView />} />
           <Route path="/prescription/:id" element={<PrescriptionView />} />
           <Route path="/chat" element={<Chat />} />
