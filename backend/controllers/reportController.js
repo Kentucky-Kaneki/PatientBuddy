@@ -17,9 +17,6 @@ const chromaClient = new CloudClient({
   database: 'patientbuddy'
 });
 
-// Get API key from environment
-const GROQ_API_KEY = process.env.GROQ_API_KEY;
-
 // ==========================================
 // Utility Functions
 // ==========================================
@@ -37,7 +34,13 @@ async function generateEmbedding(text) {
         timeout: 10000,
       }
     );
-    return response.data;
+
+    const embeddings = response.data[0]; // First token layer
+    const embedding = Array.isArray(embeddings[0]) 
+      ? embeddings.map(row => row[0]).slice(0, 384)  // Mean pool first token
+      : embeddings.slice(0, 384);
+    
+    return embedding;
   } catch (error) {
     console.log("⚠️ Using fallback embedding");
     return generateSimpleEmbedding(text);
@@ -191,7 +194,7 @@ const delay = (ms) => new Promise(resolve => setTimeout(resolve, ms));
 
 // Simple in-memory rate limiter
 let lastGroqCall = 0;
-const MIN_GROQ_INTERVAL = 2000; // 2 seconds between calls
+const MIN_GROQ_INTERVAL = 5000; // 2 seconds between calls
 
 async function rateLimitedGroqCall(apiKey, payload) {
   const now = Date.now();
@@ -220,6 +223,7 @@ async function rateLimitedGroqCall(apiKey, payload) {
     if (error.response?.status === 429) {
       // Wait longer and retry once
       console.log("Rate limited, waiting 5 seconds...");
+    
       await delay(5000);
       return await axios.post(
         "https://api.groq.com/openai/v1/chat/completions",
@@ -241,6 +245,8 @@ export const queryReport = async (req, res) => {
   try {
     const { reportId } = req.params;
     const { query, topK = 5 } = req.body;
+    const GROQ_API_KEY = process.env.GROQ_API_KEY;
+    
 
     if (!query || !query.trim()) {
       return res.status(400).json({
@@ -248,7 +254,7 @@ export const queryReport = async (req, res) => {
         error: "Query is required"
       });
     }
-
+    
     const report = await Report.findById(reportId);
     if (!report) {
       return res.status(404).json({
@@ -258,6 +264,7 @@ export const queryReport = async (req, res) => {
     }
 
     const queryEmbedding = await generateEmbedding(query);
+
     const collection = await chromaClient.getCollection({
       name: report.collectionId,
       embeddingFunction: null
@@ -283,12 +290,19 @@ ${context}
 
 Provide a clear, accurate answer based only on the information given. If the information is not in the context, say so.`;
 
+    console.log("calling groq");
+
+    console.log(GROQ_API_KEY);
+    
     const groqResponse = await rateLimitedGroqCall(GROQ_API_KEY, {
       model: "llama-3.1-8b-instant",
       messages: [{ role: "user", content: prompt }],
       temperature: 0.3,
       max_tokens: 400,
     });
+
+    console.log("Groq bolne lagi!!!");
+    
 
     const answer = groqResponse.data.choices[0].message.content;
 
@@ -308,7 +322,8 @@ Provide a clear, accurate answer based only on the information given. If the inf
         error: "API rate limit exceeded. Please wait a moment and try again.",
       });
     }
-    
+
+    console.error(error.stack)
     res.status(500).json({
       success: false,
       error: error.message,
@@ -319,9 +334,8 @@ Provide a clear, accurate answer based only on the information given. If the inf
 export const summarizeReport = async (req, res) => {
   try {
     const { reportId } = req.params;
-    const { groqApiKey } = req.body;
 
-    const apiKey = groqApiKey || GROQ_API_KEY;
+    const apiKey = process.env.GROQ_API_KEY;
 
     if (!apiKey) {
       return res.status(400).json({
