@@ -28,8 +28,7 @@ function MedicalRAGClient () {
   const chatEndRef = useRef(null);
   const API_BASE = "http://localhost:5000/api";
 
-  // ⚠️ Move to .env in production
-  const GROQ_API_KEY = "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";
+  const GROQ_API_KEY = process.env.GROQ_API_KEY;
 
   useEffect(() => {
     const mockPatient = {
