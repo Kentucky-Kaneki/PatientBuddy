@@ -1,0 +1,86 @@
+{
+  "common": {
+    "loading": "Loading…",
+    "error": "Something went wrong",
+    "back": "Back",
+    "save": "Save",
+    "cancel": "Cancel"
+  },
+
+  "nav": {
+    "dashboard": "Dashboard",
+    "upload": "Upload Report",
+    "reports": "Reports",
+    "settings": "Settings",
+    "logout": "Logout"
+  },
+
+  "upload": {
+  "title": "Upload Medical Report",
+  "drag": "Drag & drop or click to upload",
+  "formats": "PDF, JPEG, PNG, HEIC",
+  "analyze": "Analyze Report",
+  "uploading": "Uploading...",
+  "processing": "Analyzing report...",
+  "complete": "Analysis complete. Redirecting…",
+  "toast": {
+    "invalidTitle": "Invalid file type",
+    "invalidDesc": "Please upload a PDF or image file",
+    "ocrTitle": "Image OCR coming soon",
+    "ocrDesc": "Please upload a PDF for now",
+    "successTitle": "Report analyzed",
+    "successDesc": "AI summary generated successfully",
+    "failedTitle": "Upload failed"
+  }
+},
+
+  "report": {
+  "title": "Medical Report Summary",
+  "analyzing": "Analyzing your medical report…",
+  "wait": "Please wait while we generate a comprehensive summary.",
+  "errorTitle": "Error loading summary",
+
+  "print": "Print",
+  "download": "Download",
+  "share": "Share",
+
+  "askQuestions": "Ask Questions About This Report",
+  "askPlaceholder": "Ask a question…",
+  "noMessages": "Ask anything about your report.",
+  "exampleQuestions": "Example: “What medications were prescribed?” or “What were the test results?”"
+},
+
+
+  "signup": {
+  "title": "Create Your Account",
+  "subtitle": "Start understanding your health better today",
+  "name": "Name",
+  "email": "Email Address",
+  "phone": "Phone Number (Optional)",
+  "password": "Password",
+  "placeholderName": "John Doe",
+  "placeholderEmail": "you@example.com",
+  "placeholderPhone": "+1 (555) 000-0000",
+  "placeholderPassword": "••••••••",
+  "passwordHint": "Must be at least 8 characters",
+  "agree": "I agree to the",
+  "terms": "Terms of Service",
+  "privacy": "Privacy Policy",
+  "create": "Create Account",
+  "creating": "Creating account...",
+  "haveAccount": "Already have an account?",
+  "signin": "Sign in",
+  "toast": {
+    "termsTitle": "Terms Required",
+    "termsDesc": "Please accept the terms and conditions to continue.",
+    "successTitle": "Account Created!",
+    "successDesc": "Welcome to MediClear. Let's get started!",
+    "failedTitle": "Signup Failed",
+    "failedDesc": "Please try again."
+  }
+
+
+}
+
+}
+
