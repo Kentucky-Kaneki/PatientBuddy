@@ -134,9 +134,10 @@ const Dashboard = () => {
   };
 
   const handleLogout = () => {
-    localStorage.removeItem("token");
-    window.location.href = "/";
+    logout();
+    navigate("/login", { replace: true });
   };
+
 
   /* ---------------- UI (UNCHANGED) ---------------- */
 
