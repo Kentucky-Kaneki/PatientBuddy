@@ -4,6 +4,7 @@ import React, { useState, useEffect, useRef } from "react";
 import { Upload, FileText, Bot, Send, Trash2, AlertCircle } from "lucide-react";
 import { getDocument, GlobalWorkerOptions } from "pdfjs-dist";
 
+
 GlobalWorkerOptions.workerSrc =
   "https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.11.174/pdf.worker.min.js";
 
@@ -28,7 +29,7 @@ function MedicalRAGClient () {
   const chatEndRef = useRef(null);
   const API_BASE = "http://localhost:5000/api";
 
-  const GROQ_API_KEY = process.env.GROQ_API_KEY;
+  const GROQ_API_KEY = "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" // Replace with your actual GROQ API key
 
   useEffect(() => {
     const mockPatient = {
