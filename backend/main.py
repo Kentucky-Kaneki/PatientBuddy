@@ -8,22 +8,14 @@ import json
 import pickle
 import re
 from pydantic import BaseModel
+import platform
 
 from groq import Groq
 from sentence_transformers import SentenceTransformer
 import faiss
 from dotenv import load_dotenv
 
-<<<<<<< Updated upstream
 # ================= LOAD ENV =================
-=======
-import platform
-import shutil
-import pytesseract
-
-
-
->>>>>>> Stashed changes
 BASE_DIR = os.path.dirname(os.path.abspath(__file__))
 load_dotenv(os.path.join(BASE_DIR, ".env"))
 

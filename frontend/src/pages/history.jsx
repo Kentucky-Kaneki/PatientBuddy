@@ -1,12 +1,11 @@
 import { useState } from "react";
 import { Link } from "react-router-dom";
-import { motion } from "framer-motion";
+import { motion, AnimatePresence } from "framer-motion";
 import {
   ArrowLeft,
   FileText,
   Pill,
   Search,
-  Calendar,
   ChevronRight,
   TrendingUp,
   TrendingDown,
@@ -19,6 +18,7 @@ import { Input } from "@/components/ui/input";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
+import { HealthMetricChart, HealthTrendCard } from "@/components/HealthMetricChart";
 
 const historyData = [
   {
@@ -72,6 +72,7 @@ const healthTrends = [
 const History = () => {
   const [searchQuery, setSearchQuery] = useState("");
   const [activeFilter, setActiveFilter] = useState("all");
+  const [selectedMetric, setSelectedMetric] = useState(null);
 
   const filteredHistory = historyData.filter((item) => {
     const matchesSearch = item.title
@@ -82,26 +83,10 @@ const History = () => {
     return matchesSearch && matchesFilter;
   });
 
-  const getTrendIcon = (trend) => {
-    if (trend === "up") return <TrendingUp className="w-4 h-4 text-success" />;
-    if (trend === "down") return <TrendingDown className="w-4 h-4 text-success" />;
-    return <Minus className="w-4 h-4 text-muted-foreground" />;
-  };
-
-  const getTrendColor = (name, trend) => {
-    if (name === "Cholesterol") {
-      return trend === "down" ? "text-success" : "text-warning";
-    }
-    if (name === "TSH") {
-      return trend === "up" ? "text-warning" : "text-success";
-    }
-    return trend === "up" ? "text-success" : "text-warning";
-  };
-
   return (
     <div className="min-h-screen bg-background">
       {/* Header */}
-      <header className="sticky top-0 z-50 border-b">
+      <header className="sticky top-0 z-50 border-b bg-background/95 backdrop-blur supports-[backdrop-filter]:bg-background/60">
         <div className="container mx-auto px-4 py-4 flex items-center gap-4">
           <Link to="/dashboard">
             <Button variant="ghost" size="icon">
@@ -110,7 +95,7 @@ const History = () => {
           </Link>
           <div className="flex items-center gap-2">
             <div className="w-8 h-8 rounded-lg bg-primary flex items-center justify-center">
-              <Heart className="w-4 h-4 text-white" />
+              <Heart className="w-4 h-4 text-primary-foreground" />
             </div>
             <span className="font-semibold">Health History</span>
           </div>
@@ -190,27 +175,20 @@ const History = () => {
             <TabsContent value="trends">
               <Card>
                 <CardHeader>
-                  <CardTitle>Key Health Metrics</CardTitle>
+                  <CardTitle className="flex items-center gap-2">
+                    Key Health Metrics
+                    <Badge variant="secondary" className="text-xs font-normal">
+                      Click to view details
+                    </Badge>
+                  </CardTitle>
                 </CardHeader>
                 <CardContent className="space-y-4">
                   {healthTrends.map((m) => (
-                    <div key={m.name} className="flex justify-between p-4 border rounded-xl">
-                      <div className="flex gap-3">
-                        {getTrendIcon(m.trend)}
-                        <div>
-                          <p className="font-medium">{m.name}</p>
-                          <p className="text-sm text-muted-foreground">
-                            Previous: {m.previous}
-                          </p>
-                        </div>
-                      </div>
-                      <div className="text-right">
-                        <p className="font-semibold">{m.current}</p>
-                        <p className={`text-sm ${getTrendColor(m.name, m.trend)}`}>
-                          {m.change}
-                        </p>
-                      </div>
-                    </div>
+                    <HealthTrendCard
+                      key={m.name}
+                      metric={m}
+                      onClick={() => setSelectedMetric(m.name)}
+                    />
                   ))}
                 </CardContent>
               </Card>
@@ -218,6 +196,16 @@ const History = () => {
           </Tabs>
         </motion.div>
       </main>
+
+      {/* Chart Modal */}
+      <AnimatePresence>
+        {selectedMetric && (
+          <HealthMetricChart
+            metricName={selectedMetric}
+            onClose={() => setSelectedMetric(null)}
+          />
+        )}
+      </AnimatePresence>
     </div>
   );
 };
