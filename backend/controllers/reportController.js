@@ -2,6 +2,7 @@
 import mongoose from "mongoose";
 import Report from "../models/Report.js";
 import Chunk from "../models/Chunk.js";
+import Member from "../models/Member.js";
 import axios from "axios";
 
 import { CloudClient } from "chromadb";
@@ -117,21 +118,13 @@ function detectSection(text) {
 
 export const uploadReport = async (req, res) => {
   try {
-    const { patientId, fullText, fileName } = req.body;
-
-    if (!patientId || !fullText) {
-      return res.status(400).json({
-        success: false,
-        error: "Patient ID and text required",
-      });
-    }
+    const { memberId, fullText, fileName } = req.body;
 
     const reportId = new mongoose.Types.ObjectId();
     const collectionId = `report_${reportId.toString()}`;
 
     const report = new Report({
       _id: reportId,
-      patient: patientId,
       fileName: fileName || "medical_report.pdf",
       fullText,
       collectionId,
@@ -140,6 +133,12 @@ export const uploadReport = async (req, res) => {
     });
 
     await report.save();
+
+    // Add report ID to member's reports array
+    await Member.findByIdAndUpdate(
+      memberId,
+      { $push: { reports: reportId } }
+    );
 
     let collection;
     try {

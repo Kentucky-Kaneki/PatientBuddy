@@ -1,13 +1,12 @@
 import express from "express";
-import { signin, signup } from "../controllers/userController.js";
+import { signin, signup, getUserInfo } from "../controllers/userController.js";
+import { protect } from "../middleware/authMiddleware.js";
+import User from "../models/User.js";
 
 const router = express.Router();
 
+router.get("/", getUserInfo)
 router.post("/signup", signup);
 router.post("/signin", signin);
-// Patient reports route
-// router.get('/patients/:patientId/reports', getPatientReports);
-// Health check route
-// router.get('/health', healthCheck);
 
 export default router;

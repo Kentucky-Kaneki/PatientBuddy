@@ -1,16 +1,10 @@
-import { useEffect, useState } from "react";
+import { useEffect, useState } from 'react';
+import { useSearchParams } from 'react-router-dom';
 import { Link } from "react-router-dom";
 import { motion } from "framer-motion";
 import axios from "axios";
 
-import {
-  ArrowLeft,
-  FileText,
-  Pill,
-  Search,
-  ChevronRight,
-  Heart,
-} from "lucide-react";
+import { ArrowLeft, FileText, Pill, Search, ChevronRight, Heart } from "lucide-react";
 
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -18,8 +12,10 @@ import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 
-const History = () => {
+const History = (props) => {
   const [historyData, setHistoryData] = useState([]);
+  const [searchParams] = useSearchParams();
+  const memberId = searchParams.get('memberId');
   const [searchQuery, setSearchQuery] = useState("");
   const [activeFilter, setActiveFilter] = useState("all");
   const [loading, setLoading] = useState(false);
@@ -32,28 +28,13 @@ const History = () => {
       setError(null);
       
       const token = localStorage.getItem("token");
-      const userId = localStorage.getItem("userId");
 
       // 🔍 DEBUG LOGS
       console.log("🔍 Token:", token ? "✅ exists" : "❌ missing");
-      console.log("🔍 UserId:", userId);
-      console.log("🔍 All localStorage:", { ...localStorage });
-
-      if (!userId) {
-        setError("User ID not found. Please log in again.");
-        console.error("❌ No userId in localStorage");
-        return;
-      }
-
-      console.log("📤 Sending request with:", {
-        userId,
-        search: searchQuery,
-        type: activeFilter,
-      });
 
       const res = await axios.get("http://localhost:5050/api/history", {
         params: {
-          userId,
+          memberId: memberId,
           search: searchQuery,
           type: activeFilter,
         },

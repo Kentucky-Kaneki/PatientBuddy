@@ -25,6 +25,7 @@ const Signup = () => {
     password: "",
   });
   const { toast } = useToast();
+  const { signup } = useAuth();
 
   const handleInputChange = (e) => {
     const { id, value } = e.target;
@@ -48,23 +49,10 @@ description: t("signup.toast.termsDesc"),
 
     setIsLoading(true);
 
-    try {      
-      const response = await fetch("http://localhost:5050/api/patient/signup", {
-        method: "POST",
-        headers: {
-          "Content-Type": "application/json",
-        },
-        body: JSON.stringify(formData),
-      });
-      
-      if (response.ok) {
-        const data = await response.json();
-    
-        // Store token
-        if (data.token) {
-          localStorage.setItem('token', data.token);
-        }
-        
+    try {
+      const result = await signup(formData.name, formData.email, formData.password);
+
+      if (result.success) {
         toast({
           title: t("signup.toast.successTitle"),
 description: t("signup.toast.successDesc"),
@@ -73,15 +61,13 @@ description: t("signup.toast.successDesc"),
         
         // Reset form
         setFormData({
-          firstName: "",
-          lastName: "",
+          name: "",
           email: "",
           phone: "",
           password: "",
         });
-
-        // Navigate to dashboard
-        window.location.href = "/dashboard";
+        setAcceptTerms(false);
+        // Navigation is handled by AuthContext
       } else {
         toast({
           title: t("signup.toast.failedTitle"),

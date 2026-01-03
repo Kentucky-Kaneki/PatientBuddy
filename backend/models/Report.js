@@ -2,11 +2,6 @@
 import mongoose from "mongoose";
 
 const reportSchema = new mongoose.Schema({
-  patient: { 
-    type: mongoose.Schema.Types.ObjectId, 
-    ref: 'Patient', 
-    required: true 
-  },
   fileName: {
     type: String,
     required: true

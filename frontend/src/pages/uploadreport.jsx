@@ -1,11 +1,27 @@
 import { useState, useCallback } from "react";
+import { useSearchParams } from 'react-router-dom';
+import { Link, useNavigate } from "react-router-dom";
+import { motion, AnimatePresence } from "framer-motion";
 import { ArrowLeft, Upload, FileText, X, CheckCircle, Loader2, Image, File, Heart } from "lucide-react";
+
+import { Button } from "@/components/ui/button";
+import { Progress } from "@/components/ui/progress";
+import { useToast } from "@/hooks/use-toast";
+
+import { getDocument, GlobalWorkerOptions } from "pdfjs-dist";
+
+// PDF worker
+GlobalWorkerOptions.workerSrc =
+  "https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.11.174/pdf.worker.min.js";
 
 // 🔧 CONFIG
 const API_BASE = "http://localhost:5050/api";
 const DEMO_PATIENT_ID = "507f1f77bcf86cd799439011";
 
 const UploadReport = () => {
+  const [searchParams] = useSearchParams();
+  const memberId = searchParams.get('memberId');
+  
   const [dragActive, setDragActive] = useState(false);
   const [file, setFile] = useState(null);
   const [uploadState, setUploadState] = useState("idle");
@@ -115,7 +131,7 @@ const UploadReport = () => {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
-          patientId: DEMO_PATIENT_ID,
+          memberId: memberId,
           fullText: extractedText,
           fileName: file.name,
           autoSummarize: true, // Let backend handle summarization
