@@ -1,7 +1,7 @@
 import { useState } from "react";
 import { Link } from "react-router-dom";
 import { motion } from "framer-motion";
-import { FileText, Pill, MessageCircle, History, Users, Plus, Upload, TrendingUp, Bell, Settings, Heart, ChevronRight, Calendar, AlertCircle } from "lucide-react";
+import { FileText, LogOut, Pill, MessageCircle, History, Users, Plus, Upload, TrendingUp, Bell, Settings, Heart, ChevronRight, Calendar, AlertCircle } from "lucide-react";
 
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
@@ -71,6 +71,11 @@ const familyMembers = [
 const Dashboard = () => {
   const [selectedMember, setSelectedMember] = useState("You");
 
+  const handleLogout = () => {
+    localStorage.removeItem('token');
+    window.location.href = "/";
+  };
+
   return (
     <div className="min-h-screen bg-background">
       {/* Header */}
@@ -84,11 +89,8 @@ const Dashboard = () => {
           </Link>
           
           <div className="flex items-center gap-4">
-            <Button variant="ghost" size="icon">
-              <Bell className="w-5 h-5" />
-            </Button>
-            <Button variant="ghost" size="icon">
-              <Settings className="w-5 h-5" />
+            <Button variant="ghost" size="icon" onClick={handleLogout}>
+              <LogOut className="w-5 h-5" />
             </Button>
             <Avatar className="h-10 w-10">
               <AvatarImage src="" />

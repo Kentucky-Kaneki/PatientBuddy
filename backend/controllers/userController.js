@@ -31,10 +31,7 @@ export const signup = async (req, res) => {
       email,
       password: hashedPassword,
       phone,
-    });
-
-    console.log("newUser", newUser);
-    
+    });    
 
     await newUser.save();
 
@@ -43,8 +40,6 @@ export const signup = async (req, res) => {
       process.env.JWT_SECRET,
       { expiresIn: "5h" }
     );
-
-    console.log("Successfullll");
     
     res.status(201).json({ 
       message: "Signup successful", 
@@ -70,12 +65,13 @@ export const signin = async (req, res) => {
       return res.status(400).json({ message: "Email and password required" });
     }
 
-    const user = await User.findOne({ email }).select('+password');
-    if (!user) {
+    console.log(email);
+    
+    const user = await User.findOne({ email });
+    
+    if (user == null) {
       return res.status(404).json({ message: "Invalid credentials" });
     }
-
-    console.log("userFound", user.name);
 
     const isMatch = await bcrypt.compare(password, user.password);
     if (!isMatch) {

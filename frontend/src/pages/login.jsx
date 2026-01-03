@@ -1,4 +1,5 @@
-import { useState } from "react";
+import { useState, useEffect } from "react";
+import { useNavigate } from "react-router-dom";
 import { Link } from "react-router-dom";
 import { motion } from "framer-motion";
 import { Heart, Mail, Lock, Eye, EyeOff, ArrowRight } from "lucide-react";
@@ -13,6 +14,15 @@ const Login = () => {
   const [showPassword, setShowPassword] = useState(false);
   const [isLoading, setIsLoading] = useState(false);
   const { toast } = useToast();
+  const navigate = useNavigate();
+
+  // Auto-redirect if token exists (runs on mount)
+  useEffect(() => {
+    const token = localStorage.getItem("token");
+    if (token) {
+     navigate("/dashboard", { replace: true });
+    }
+  }, []);
 
   const handleSubmit = async (e) => {
     e.preventDefault();
@@ -27,6 +37,14 @@ const Login = () => {
         body: JSON.stringify({ email, password }), 
       });
 
+      if (response.status === 404) {
+        toast({
+          title: "Login Failed",
+          description: "Invalid email or password. Please try again."
+        });
+        return;
+      }
+
       const data = await response.json();
 
       localStorage.setItem("token", data.token);
@@ -37,7 +55,7 @@ const Login = () => {
       });
 
     // Navigate to dashboard
-    window.location.href = "/dashboard";
+    navigate("/dashboard", { replace: true });
     } catch (error) {
       console.error(error);
       toast({
