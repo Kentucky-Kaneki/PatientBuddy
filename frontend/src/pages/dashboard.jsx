@@ -1,11 +1,16 @@
-import { useState } from "react";
+import { useState, useEffect } from "react";
+import { useNavigate } from "react-router-dom";
 import { Link } from "react-router-dom";
 import { motion } from "framer-motion";
-import { FileText, LogOut, Pill, MessageCircle, History, Users, Plus, Upload, TrendingUp, Bell, Settings, Heart, ChevronRight, Calendar, AlertCircle } from "lucide-react";
+import { FileText, LogOut, Pill, MessageCircle, Clock, User, Plus, Upload, TrendingUp, Bell, Settings, Heart, ChevronRight, Calendar, AlertCircle } from "lucide-react";
 
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
+
+import UploadReport from "../pages/uploadreport";
+import Chat from "../pages/chat";
+import History from "../pages/history";
 
 const quickActions = [
   {
@@ -30,7 +35,7 @@ const quickActions = [
     color: "bg-info/10 text-info",
   },
   {
-    icon: History,
+    icon: Clock,
     title: "View History",
     description: "Past reports & trends",
     href: "/history",
@@ -38,43 +43,59 @@ const quickActions = [
   },
 ];
 
-const recentActivity = [
-  {
-    type: "report",
-    title: "Blood Test Report",
-    date: "Dec 28, 2024",
-    status: "analyzed",
-    statusColor: "text-success",
-  },
-  {
-    type: "prescription",
-    title: "Dr. Smith Prescription",
-    date: "Dec 25, 2024",
-    status: "analyzed",
-    statusColor: "text-success",
-  },
-  {
-    type: "report",
-    title: "Thyroid Panel",
-    date: "Dec 20, 2024",
-    status: "needs attention",
-    statusColor: "text-warning",
-  },
-];
-
-const familyMembers = [
-  { name: "You", initials: "JD", color: "bg-primary" },
-  { name: "Sarah", initials: "SD", color: "bg-info" },
-  { name: "Dad", initials: "RD", color: "bg-success" },
-];
-
 const Dashboard = () => {
-  const [selectedMember, setSelectedMember] = useState("You");
+  const [user, setUser] = useState(null);
+  const [members, setMembers] = useState([]);
+  const [isLoading, setIsLoading] = useState(true);
+  const [error, setError] = useState(null);
+  const [selectedMember, setSelectedMember] = useState(null);
+  const navigate = useNavigate();
 
   const handleLogout = () => {
     localStorage.removeItem('token');
-    window.location.href = "/";
+    navigate("/dashboard", { replace: true });
   };
+
+  // fetch user and members data
+  useEffect(() => {
+    const fetchUserData = async () => {
+      try {
+        setIsLoading(true);
+        const token = localStorage.getItem('token');
+        if (!token) {
+          setError('No token found. Please login.');
+          return;
+        }
+        
+        const response = await fetch('http://localhost:5050/api/patient/', {
+          method: 'GET',
+          headers: {
+            'Authorization': `Bearer ${token}`,
+            'Content-Type': 'application/json',
+          },
+        });
+
+        if (!response.ok) {
+          throw new Error('Failed to fetch user data');
+        }
+
+        const data = await response.json();
+        
+        setUser(data.user);
+        setMembers(data.user.members || []);
+        setSelectedMember(data.user.members[0]._id)  // Populated members array
+      } catch (err) {
+        setError(err.message);
+      } finally {
+        setIsLoading(false);
+      }
+    };
+
+    fetchUserData();
+  }, []);
+
+  if (isLoading) return <div className="loading">Loading dashboard...</div>;
+  if (error) return <div className="error">Error: {error}</div>;
 
   return (
     <div className="min-h-screen bg-background">
@@ -89,12 +110,13 @@ const Dashboard = () => {
           </Link>
           
           <div className="flex items-center gap-4">
-            <Button variant="ghost" size="icon" onClick={handleLogout}>
-              <LogOut className="w-5 h-5" />
-            </Button>
             <Avatar className="h-10 w-10">
               <AvatarImage src="" />
-              <AvatarFallback className="bg-primary text-primary-foreground">JD</AvatarFallback>
+                <AvatarFallback className="bg-primary text-primary-foreground">
+                  <Button variant="ghost" size="icon" onClick={handleLogout}>
+                    <LogOut className="w-5 h-5" />
+                  </Button>
+                </AvatarFallback>
             </Avatar>
           </div>
         </div>
@@ -110,7 +132,7 @@ const Dashboard = () => {
               animate={{ opacity: 1, y: 0 }}
             >
               <h1 className="text-3xl font-bold text-foreground mb-2">
-                Good morning, John! 👋
+                Good morning, {user.name}! 👋
               </h1>
               <p className="text-muted-foreground">
                 Here's your health dashboard. Upload a new document or review your history.
@@ -125,68 +147,84 @@ const Dashboard = () => {
             >
               <h2 className="text-lg font-semibold text-foreground mb-4">Quick Actions</h2>
               <div className="grid sm:grid-cols-2 gap-4">
-                {quickActions.map((action, index) => (
-                  <Link key={action.title} to={action.href}>
-                    <Card className="group cursor-pointer card-hover border-border hover:border-primary/30">
-                      <CardContent className="p-5 flex items-center gap-4">
-                        <div className={`w-12 h-12 rounded-xl ${action.color} flex items-center justify-center group-hover:scale-110 transition-transform`}>
-                          <action.icon className="w-6 h-6" />
-                        </div>
-                        <div className="flex-1">
-                          <h3 className="font-semibold text-foreground">{action.title}</h3>
-                          <p className="text-sm text-muted-foreground">{action.description}</p>
-                        </div>
-                        <ChevronRight className="w-5 h-5 text-muted-foreground group-hover:text-primary transition-colors" />
-                      </CardContent>
-                    </Card>
-                  </Link>
-                ))}
-              </div>
-            </motion.div>
+                
+                {/* 1. Upload Report */}
+                <Card 
+                  className="group cursor-pointer card-hover border-border hover:border-primary/30"
+                  onClick={() => {
+                    navigate(`/upload/prescription?memberId=${selectedMember}`);
+                  }}
+                >
+                  <CardContent className="p-5 flex items-center gap-4">
+                    <div className="w-12 h-12 rounded-xl bg-primary/10 flex items-center justify-center group-hover:scale-110 transition-transform">
+                      <FileText className="w-6 h-6 text-primary" />
+                    </div>
+                    <div className="flex-1">
+                      <h3 className="font-semibold text-foreground">Upload Report</h3>
+                      <p className="text-sm text-muted-foreground">Medical or lab report</p>
+                    </div>
+                    <ChevronRight className="w-5 h-5 text-muted-foreground group-hover:text-primary transition-colors" />
+                  </CardContent>
+                </Card>
 
-            {/* Recent Activity */}
-            <motion.div
-              initial={{ opacity: 0, y: 20 }}
-              animate={{ opacity: 1, y: 0 }}
-              transition={{ delay: 0.2 }}
-            >
-              <div className="flex items-center justify-between mb-4">
-                <h2 className="text-lg font-semibold text-foreground">Recent Activity</h2>
-                <Link to="/history">
-                  <Button variant="ghost" size="sm">
-                    View All
-                    <ChevronRight className="w-4 h-4 ml-1" />
-                  </Button>
-                </Link>
+                {/* 2. Upload Prescription */}
+                <Card 
+                  className="group cursor-pointer card-hover border-border hover:border-primary/30"
+                  onClick={() => {
+                    navigate(`/upload/prescription?memberId=${selectedMember}`);
+                  }}
+                >
+                  <CardContent className="p-5 flex items-center gap-4">
+                    <div className="w-12 h-12 rounded-xl bg-success/10 flex items-center justify-center group-hover:scale-110 transition-transform">
+                      <Pill className="w-6 h-6 text-success" />
+                    </div>
+                    <div className="flex-1">
+                      <h3 className="font-semibold text-foreground">Upload Prescription</h3>
+                      <p className="text-sm text-muted-foreground">Handwritten or printed</p>
+                    </div>
+                    <ChevronRight className="w-5 h-5 text-muted-foreground group-hover:text-primary transition-colors" />
+                  </CardContent>
+                </Card>
+
+                {/* 3. AI Assistant */}
+                <Card 
+                  className="group cursor-pointer card-hover border-border hover:border-primary/30"
+                  onClick={() => {
+                    navigate(`/chat?memberId=${selectedMember}`);
+                  }}
+                >
+                  <CardContent className="p-5 flex items-center gap-4">
+                    <div className="w-12 h-12 rounded-xl bg-info/10 flex items-center justify-center group-hover:scale-110 transition-transform">
+                      <MessageCircle className="w-6 h-6 text-info" />
+                    </div>
+                    <div className="flex-1">
+                      <h3 className="font-semibold text-foreground">AI Assistant</h3>
+                      <p className="text-sm text-muted-foreground">Ask health questions</p>
+                    </div>
+                    <ChevronRight className="w-5 h-5 text-muted-foreground group-hover:text-primary transition-colors" />
+                  </CardContent>
+                </Card>
+
+                {/* 4. View History */}
+                <Card 
+                  className="group cursor-pointer card-hover border-border hover:border-primary/30"
+                  onClick={() => {
+                    navigate(`/history?memberId=${selectedMember}`);
+                  }}
+                >
+                  <CardContent className="p-5 flex items-center gap-4">
+                    <div className="w-12 h-12 rounded-xl bg-warning/10 flex items-center justify-center group-hover:scale-110 transition-transform">
+                      <Clock className="w-6 h-6 text-warning" />
+                    </div>
+                    <div className="flex-1">
+                      <h3 className="font-semibold text-foreground">View History</h3>
+                      <p className="text-sm text-muted-foreground">Past reports & trends</p>
+                    </div>
+                    <ChevronRight className="w-5 h-5 text-muted-foreground group-hover:text-primary transition-colors" />
+                  </CardContent>
+                </Card>
+
               </div>
-              <Card className="border-border">
-                <CardContent className="p-0 divide-y divide-border">
-                  {recentActivity.map((item, index) => (
-                    <Link 
-                      key={index} 
-                      to={item.type === "report" ? "/report/1" : "/prescription/1"}
-                      className="flex items-center gap-4 p-4 hover:bg-muted/50 transition-colors"
-                    >
-                      <div className={`w-10 h-10 rounded-lg ${item.type === "report" ? "bg-primary/10" : "bg-success/10"} flex items-center justify-center`}>
-                        {item.type === "report" ? (
-                          <FileText className="w-5 h-5 text-primary" />
-                        ) : (
-                          <Pill className="w-5 h-5 text-success" />
-                        )}
-                      </div>
-                      <div className="flex-1">
-                        <h3 className="font-medium text-foreground">{item.title}</h3>
-                        <div className="flex items-center gap-2 text-sm">
-                          <Calendar className="w-3 h-3 text-muted-foreground" />
-                          <span className="text-muted-foreground">{item.date}</span>
-                          <span className={`${item.statusColor} font-medium`}>• {item.status}</span>
-                        </div>
-                      </div>
-                      <ChevronRight className="w-5 h-5 text-muted-foreground" />
-                    </Link>
-                  ))}
-                </CardContent>
-              </Card>
             </motion.div>
 
             {/* Health Insight Card */}
@@ -239,19 +277,19 @@ const Dashboard = () => {
                   <CardDescription>Switch between family members</CardDescription>
                 </CardHeader>
                 <CardContent className="space-y-2">
-                  {familyMembers.map((member) => (
+                  {members.map((member) => (                   
                     <button
                       key={member.name}
-                      onClick={() => setSelectedMember(member.name)}
+                      onClick={() => setSelectedMember(member._id)}
                       className={`w-full flex items-center gap-3 p-3 rounded-xl transition-colors ${
-                        selectedMember === member.name 
+                        selectedMember === member._id 
                           ? "bg-primary/10 border border-primary/30" 
                           : "hover:bg-muted"
                       }`}
                     >
                       <Avatar className="h-10 w-10">
-                        <AvatarFallback className={`${member.color} text-primary-foreground`}>
-                          {member.initials}
+                        <AvatarFallback className={"bg-primary text-primary-foreground"}>
+                          <User className="w-5 h-5" />
                         </AvatarFallback>
                       </Avatar>
                       <span className="font-medium text-foreground">{member.name}</span>

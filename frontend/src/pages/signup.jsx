@@ -79,7 +79,7 @@ const Signup = () => {
       } else {
         toast({
           title: "Signup Failed",
-          description: data.message || "Please try again.",
+          description: "Please try again.",
           variant: "destructive",
         });
       }

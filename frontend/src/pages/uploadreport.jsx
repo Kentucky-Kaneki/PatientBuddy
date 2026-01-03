@@ -1,4 +1,5 @@
 import { useState, useCallback } from "react";
+import { useSearchParams } from 'react-router-dom';
 import { Link, useNavigate } from "react-router-dom";
 import { motion, AnimatePresence } from "framer-motion";
 import {
@@ -28,6 +29,9 @@ const API_BASE = "http://localhost:5050/api";
 const DEMO_PATIENT_ID = "507f1f77bcf86cd799439011";
 
 const UploadReport = () => {
+  const [searchParams] = useSearchParams();
+  const memberId = searchParams.get('memberId');
+  
   const [dragActive, setDragActive] = useState(false);
   const [file, setFile] = useState(null);
   const [uploadState, setUploadState] = useState("idle"); // idle | uploading | processing | complete

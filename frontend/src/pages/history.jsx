@@ -1,18 +1,8 @@
-import { useState } from "react";
+import { useEffect, useState } from 'react';
+import { useSearchParams } from 'react-router-dom';
 import { Link } from "react-router-dom";
 import { motion } from "framer-motion";
-import {
-  ArrowLeft,
-  FileText,
-  Pill,
-  Search,
-  Calendar,
-  ChevronRight,
-  TrendingUp,
-  TrendingDown,
-  Minus,
-  Heart,
-} from "lucide-react";
+import { ArrowLeft, FileText, Pill, Search, Calendar, ChevronRight, TrendingUp, TrendingDown, Minus, Heart } from "lucide-react";
 
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -69,7 +59,9 @@ const healthTrends = [
   { name: "TSH", current: "4.8 mIU/L", previous: "3.5 mIU/L", trend: "up", change: "+37%" },
 ];
 
-const History = () => {
+const History = (props) => {
+  const [searchParams] = useSearchParams();
+  const memberId = searchParams.get('memberId');
   const [searchQuery, setSearchQuery] = useState("");
   const [activeFilter, setActiveFilter] = useState("all");
 

@@ -1,4 +1,5 @@
 import { useState, useRef, useEffect } from "react";
+import { useSearchParams } from 'react-router-dom';
 import { Link } from "react-router-dom";
 import { motion, AnimatePresence } from "framer-motion";
 import {
@@ -27,6 +28,9 @@ const suggestedQuestions = [
 ];
 
 const Chat = () => {
+  const [searchParams] = useSearchParams();
+  const memberId = searchParams.get('memberId');
+
   const [messages, setMessages] = useState([
     {
       id: "1",

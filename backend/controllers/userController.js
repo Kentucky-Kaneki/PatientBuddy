@@ -1,18 +1,19 @@
 import bcrypt from "bcrypt";
 import jwt from "jsonwebtoken";
 import User from "../models/User.js";
+import Member from "../models/Member.js";
 
-export const requireAuth = (req, res, next) => {
-  const authHeader = req.headers.authorization;
-  if (!authHeader) return res.status(401).json({ message: "No token provided" });
-
-  const token = authHeader.split(" ")[1];
+export const getUserInfo = async (req, res) => {
   try {
+    const token = req.headers['authorization'].split(" ")[1];
     const decoded = jwt.verify(token, process.env.JWT_SECRET);
-    req.user = decoded; // Attach decoded info (id, email) to request object
-    next();
+    req.user = decoded;
+
+    const user = await User.findById(req.user.id).populate('members');
+    
+    res.json({ user });
   } catch (err) {
-    return res.status(401).json({ message: "Invalid token" });
+    res.status(500).json({ error: 'Server error' });
   }
 };
 
@@ -31,7 +32,16 @@ export const signup = async (req, res) => {
       email,
       password: hashedPassword,
       phone,
-    });    
+      members: []
+    });
+    
+    // Create primary member (same name as user)
+    const primaryMember = new Member({
+      name,
+    });
+    await primaryMember.save();
+
+    newUser.members.push(primaryMember._id);
 
     await newUser.save();
 
@@ -64,8 +74,6 @@ export const signin = async (req, res) => {
     if (!email || !password) {
       return res.status(400).json({ message: "Email and password required" });
     }
-
-    console.log(email);
     
     const user = await User.findOne({ email });
     
