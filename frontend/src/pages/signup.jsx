@@ -44,7 +44,7 @@ const Signup = () => {
     setIsLoading(true);
 
     try {      
-      const response = await fetch("http://localhost:5000/api/patient/signup", {
+      const response = await fetch("http://localhost:5050/api/patient/signup", {
         method: "POST",
         headers: {
           "Content-Type": "application/json",
