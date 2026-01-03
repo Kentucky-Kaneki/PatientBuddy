@@ -289,10 +289,6 @@ Medical Report Context:
 ${context}
 
 Provide a clear, accurate answer based only on the information given. If the information is not in the context, say so.`;
-
-    console.log("calling groq");
-
-    console.log(GROQ_API_KEY);
     
     const groqResponse = await rateLimitedGroqCall(GROQ_API_KEY, {
       model: "llama-3.1-8b-instant",
@@ -300,10 +296,7 @@ Provide a clear, accurate answer based only on the information given. If the inf
       temperature: 0.3,
       max_tokens: 400,
     });
-
-    console.log("Groq bolne lagi!!!");
     
-
     const answer = groqResponse.data.choices[0].message.content;
 
     res.json({

@@ -8,6 +8,8 @@ import { Label } from "@/components/ui/label";
 import { useToast } from "@/hooks/use-toast";
 
 const Login = () => {
+  const [email, setEmail] = useState("");
+  const [password, setPassword] = useState("");
   const [showPassword, setShowPassword] = useState(false);
   const [isLoading, setIsLoading] = useState(false);
   const { toast } = useToast();
@@ -16,16 +18,36 @@ const Login = () => {
     e.preventDefault();
     setIsLoading(true);
 
-    // Simulate login
-    await new Promise((resolve) => setTimeout(resolve, 1500));
+    try {      
+      const response = await fetch("http://localhost:5000/api/patient/signin", {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json", 
+        },
+        body: JSON.stringify({ email, password }), 
+      });
 
-    toast({
-      title: "Welcome back!",
-      description: "You have been successfully logged in.",
-    });
+      const data = await response.json();
+
+      localStorage.setItem("token", data.token);
+
+      toast({
+        title: "Welcome back!",
+        description: "You have been successfully logged in.",
+      });
 
     // Navigate to dashboard
     window.location.href = "/dashboard";
+    } catch (error) {
+      console.error(error);
+      toast({
+        title: "Connection Error",
+        description: "Unable to connect to server. Please check your connection.",
+        variant: "destructive",
+      });
+    } finally {
+      setIsLoading(false);
+    }    
   };
 
   return (
@@ -58,6 +80,8 @@ const Login = () => {
                 <Mail className="absolute left-3 top-1/2 -translate-y-1/2 w-5 h-5 text-muted-foreground" />
                 <Input
                   id="email"
+                  value={email}
+                  onChange={(e) => setEmail(e.target.value)}
                   type="email"
                   placeholder="you@example.com"
                   className="pl-10 h-12 rounded-xl"
@@ -77,6 +101,8 @@ const Login = () => {
                 <Lock className="absolute left-3 top-1/2 -translate-y-1/2 w-5 h-5 text-muted-foreground" />
                 <Input
                   id="password"
+                  value={password}
+                  onChange={(e) => setPassword(e.target.value)}
                   type={showPassword ? "text" : "password"}
                   placeholder="••••••••"
                   className="pl-10 pr-10 h-12 rounded-xl"
