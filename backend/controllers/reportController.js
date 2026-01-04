@@ -345,6 +345,137 @@ Provide a clear, accurate answer based only on the information given. If the inf
   }
 };
 
+// Add this function to your reportController.js
+// Place it RIGHT AFTER your existing queryReport function
+
+// ==========================================
+// ⚡ STREAMING QUERY WITH GROQ
+// ==========================================
+
+export const queryReportStream = async (req, res) => {
+  const { reportId } = req.params;
+  const { query, topK = 5 } = req.body;
+  const GROQ_API_KEY = process.env.GROQ_API_KEY;
+
+  // Set headers for Server-Sent Events
+  res.setHeader('Content-Type', 'text/event-stream');
+  res.setHeader('Cache-Control', 'no-cache');
+  res.setHeader('Connection', 'keep-alive');
+  res.setHeader('Access-Control-Allow-Origin', '*');
+
+  try {
+    // Validation
+    if (!query || !query.trim()) {
+      res.write(`data: ${JSON.stringify({ error: "Query is required" })}\n\n`);
+      return res.end();
+    }
+
+    // 1. Get report
+    const report = await Report.findById(reportId);
+    if (!report) {
+      res.write(`data: ${JSON.stringify({ error: "Report not found" })}\n\n`);
+      return res.end();
+    }
+
+    // 2. Get embedding and search ChromaDB
+    const queryEmbedding = await generateEmbedding(query);
+
+    const collection = await chromaClient.getCollection({
+      name: report.collectionId,
+      embeddingFunction: null
+    });
+
+    const results = await collection.query({
+      queryEmbeddings: [queryEmbedding],
+      nResults: topK,
+    });
+
+    const chunks = results.documents[0].map((doc, i) => ({
+      text: doc,
+      similarity: 1 - (results.distances[0][i] || 0),
+      metadata: results.metadatas[0][i],
+    }));
+
+    const context = chunks.map(c => c.text).join("\n\n");
+
+    // 3. Streaming prompt
+    const prompt = `Based on the following medical report excerpts, answer this question: "${query}"
+
+Medical Report Context:
+${context}
+
+Provide a clear, accurate answer based only on the information given. If the information is not in the context, say so.`;
+
+    // 4. ⚡ STREAM with Groq API
+    const response = await axios.post(
+      "https://api.groq.com/openai/v1/chat/completions",
+      {
+        model: "llama-3.3-70b-versatile", // Faster model for streaming
+        messages: [{ role: "user", content: prompt }],
+        temperature: 0.3,
+        max_tokens: 1024,
+        stream: true, // ⚡ Enable streaming
+      },
+      {
+        headers: {
+          Authorization: `Bearer ${GROQ_API_KEY}`,
+          "Content-Type": "application/json",
+        },
+        responseType: 'stream', // Important for axios streaming
+        timeout: 30000,
+      }
+    );
+
+    // 5. Parse and forward stream to frontend
+    response.data.on('data', (chunk) => {
+      const lines = chunk.toString().split('\n').filter(line => line.trim() !== '');
+      
+      for (const line of lines) {
+        if (line.startsWith('data: ')) {
+          const data = line.slice(6); // Remove 'data: ' prefix
+          
+          if (data === '[DONE]') {
+            res.write(`data: ${JSON.stringify({ done: true })}\n\n`);
+            continue;
+          }
+
+          try {
+            const parsed = JSON.parse(data);
+            const token = parsed.choices?.[0]?.delta?.content;
+            
+            if (token) {
+              res.write(`data: ${JSON.stringify({ token })}\n\n`);
+            }
+          } catch (e) {
+            // Skip invalid JSON
+          }
+        }
+      }
+    });
+
+    response.data.on('end', () => {
+      res.write(`data: ${JSON.stringify({ done: true })}\n\n`);
+      res.end();
+    });
+
+    response.data.on('error', (error) => {
+      console.error('Stream error:', error);
+      res.write(`data: ${JSON.stringify({ error: error.message })}\n\n`);
+      res.end();
+    });
+
+  } catch (error) {
+    console.error("Streaming query error:", error);
+    
+    if (error.response?.status === 429) {
+      res.write(`data: ${JSON.stringify({ error: "Service is busy. Please try again in a moment." })}\n\n`);
+    } else {
+      res.write(`data: ${JSON.stringify({ error: error.message })}\n\n`);
+    }
+    res.end();
+  }
+};
+
 export const summarizeReport = async (req, res) => {
   try {
     // 🔹 1. Detect user language from frontend

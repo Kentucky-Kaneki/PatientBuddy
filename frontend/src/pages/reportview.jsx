@@ -5,7 +5,6 @@ import ReactMarkdown from "react-markdown";
 import { useTranslation } from "react-i18next";
 import LanguageSwitcher from "@/components/LanguageSwitcher";
 
-
 import {
   ArrowLeft,
   Bot,
@@ -28,7 +27,7 @@ const API_BASE = "http://localhost:5050/api";
 
 const ReportView = () => {
   const { id: reportId } = useParams();
-  const { i18n } = useTranslation(); // ✅ ADD THIS
+  const { i18n } = useTranslation();
   const { t } = useTranslation();
 
   const [summary, setSummary] = useState("");
@@ -39,22 +38,16 @@ const ReportView = () => {
   const [messages, setMessages] = useState([]);
   const [input, setInput] = useState("");
   const [chatLoading, setChatLoading] = useState(false);
+  const [streamingMessageIndex, setStreamingMessageIndex] = useState(null);
 
   const chatEndRef = useRef(null);
+  const abortControllerRef = useRef(null);
 
-  /* =============================
-     HANDLE PRINT
-     ============================= */
-  const handlePrint = () => {
-    window.print();
-  };
+  /* ============================= UTILITIES ============================= */
+  const handlePrint = () => window.print();
 
-  /* =============================
-     HANDLE DOWNLOAD
-     ============================= */
   const handleDownload = () => {
     if (!summary) return;
-    
     const element = document.createElement("a");
     const file = new Blob([summary], { type: 'text/plain' });
     element.href = URL.createObjectURL(file);
@@ -65,12 +58,8 @@ const ReportView = () => {
     URL.revokeObjectURL(element.href);
   };
 
-  /* =============================
-     HANDLE SHARE
-     ============================= */
   const handleShare = async () => {
     if (!summary) return;
-    
     if (navigator.share) {
       try {
         await navigator.share({
@@ -95,62 +84,69 @@ const ReportView = () => {
     });
   };
 
-  /* =============================
-     FETCH SUMMARY ON LOAD
-     ============================= */
+  /* ============================= FETCH SUMMARY ============================= */
   useEffect(() => {
     const fetchSummary = async () => {
-  try {
-    const res = await fetch(
-      `${API_BASE}/reports/${reportId}/summarize`,
-      {
-        method: "POST",
-        headers: {
-          "Accept-Language": i18n.language // ✅ THIS IS THE KEY LINE
+      try {
+        const res = await fetch(
+          `${API_BASE}/reports/${reportId}/summarize`,
+          {
+            method: "POST",
+            headers: {
+              "Accept-Language": i18n.language
+            }
+          }
+        );
+
+        const data = await res.json();
+        if (!data.success) {
+          throw new Error(data.error);
         }
+
+        setSummary(data.summary);
+        setError("");
+      } catch (err) {
+        setError(err.message || "Failed to load summary");
+      } finally {
+        setLoadingSummary(false);
       }
-    );
-
-    const data = await res.json();
-    if (!data.success) {
-      throw new Error(data.error);
-    }
-
-    setSummary(data.summary);
-    setError("");
-  } catch (err) {
-    setError(err.message || "Failed to load summary");
-  } finally {
-    setLoadingSummary(false);
-  }
-};
-
+    };
 
     fetchSummary();
-  }, [reportId]);
+  }, [reportId, i18n.language]);
 
-  /* =============================
-     AUTO SCROLL CHAT
-     ============================= */
+  /* ============================= AUTO SCROLL ============================= */
   useEffect(() => {
     chatEndRef.current?.scrollIntoView({ behavior: "smooth" });
   }, [messages]);
 
-  /* =============================
-     HANDLE CHAT QUERY
-     ============================= */
+  /* ============================= ⚡ OPTIMIZED STREAMING CHAT ============================= */
   const sendMessage = async (e) => {
     if (e) e.preventDefault();
     if (!input.trim() || chatLoading) return;
 
     const userMessage = input;
+    const userMsgIndex = messages.length;
+    const assistantMsgIndex = messages.length + 1;
+
     setMessages((m) => [...m, { role: "user", content: userMessage }]);
     setInput("");
     setChatLoading(true);
+    setStreamingMessageIndex(assistantMsgIndex);
+
+    // Add empty assistant message that will be updated
+    setMessages((m) => [...m, { role: "assistant", content: "", streaming: true }]);
+
+    // Cancel any existing request
+    if (abortControllerRef.current) {
+      abortControllerRef.current.abort();
+    }
+    abortControllerRef.current = new AbortController();
 
     try {
+      // ⚡ Option 1: Server-Sent Events (SSE) - Best for streaming
       const res = await fetch(
-        `${API_BASE}/reports/${reportId}/query`,
+        `${API_BASE}/reports/${reportId}/query/stream`, // New streaming endpoint
         {
           method: "POST",
           headers: { "Content-Type": "application/json" },
@@ -158,33 +154,118 @@ const ReportView = () => {
             query: userMessage,
             topK: 5,
           }),
+          signal: abortControllerRef.current.signal,
         }
       );
 
-      const data = await res.json();
-      if (!data.success) throw new Error(data.error);
+      if (!res.ok) throw new Error('Network response was not ok');
 
-      setMessages((m) => [
-        ...m,
-        { role: "assistant", content: data.answer },
-      ]);
+      const reader = res.body.getReader();
+      const decoder = new TextDecoder();
+      let accumulatedText = "";
+
+      while (true) {
+        const { done, value } = await reader.read();
+        if (done) break;
+
+        const chunk = decoder.decode(value, { stream: true });
+        const lines = chunk.split('\n');
+
+        for (const line of lines) {
+          if (line.startsWith('data: ')) {
+            try {
+              const data = JSON.parse(line.slice(6));
+              
+              if (data.token) {
+                accumulatedText += data.token;
+                setMessages((m) => {
+                  const newMessages = [...m];
+                  newMessages[assistantMsgIndex] = {
+                    role: "assistant",
+                    content: accumulatedText,
+                    streaming: true
+                  };
+                  return newMessages;
+                });
+              } else if (data.done) {
+                setMessages((m) => {
+                  const newMessages = [...m];
+                  newMessages[assistantMsgIndex] = {
+                    role: "assistant",
+                    content: accumulatedText,
+                    streaming: false
+                  };
+                  return newMessages;
+                });
+              } else if (data.error) {
+                throw new Error(data.error);
+              }
+            } catch (e) {
+              // Skip malformed JSON
+            }
+          }
+        }
+      }
+
     } catch (err) {
-      setMessages((m) => [
-        ...m,
-        {
-          role: "assistant",
-          content: "❌ " + err.message,
-          isError: true,
-        },
-      ]);
+      if (err.name === 'AbortError') {
+        console.log('Request was cancelled');
+        return;
+      }
+
+      // ⚡ Fallback: If streaming endpoint doesn't exist, use regular endpoint
+      try {
+        const res = await fetch(
+          `${API_BASE}/reports/${reportId}/query`,
+          {
+            method: "POST",
+            headers: { "Content-Type": "application/json" },
+            body: JSON.stringify({
+              query: userMessage,
+              topK: 5,
+            }),
+          }
+        );
+
+        const data = await res.json();
+        if (!data.success) throw new Error(data.error);
+
+        setMessages((m) => {
+          const newMessages = [...m];
+          newMessages[assistantMsgIndex] = {
+            role: "assistant",
+            content: data.answer
+          };
+          return newMessages;
+        });
+      } catch (fallbackErr) {
+        setMessages((m) => {
+          const newMessages = [...m];
+          newMessages[assistantMsgIndex] = {
+            role: "assistant",
+            content: "❌ " + (fallbackErr.message || "Failed to get response"),
+            isError: true,
+          };
+          return newMessages;
+        });
+      }
     } finally {
       setChatLoading(false);
+      setStreamingMessageIndex(null);
+      abortControllerRef.current = null;
     }
   };
 
-  /* =============================
-     UI
-     ============================= */
+  // Cleanup on unmount
+  useEffect(() => {
+    return () => {
+      if (abortControllerRef.current) {
+        abortControllerRef.current.abort();
+      }
+    };
+  }, []);
+
+  /* ============================= UI ============================= */
   return (
     <div className="min-h-screen bg-background">
       {/* HEADER */}
@@ -197,8 +278,8 @@ const ReportView = () => {
           </Link>
 
           <div className="flex items-center gap-3">
-  <LanguageSwitcher />
-</div>
+            <LanguageSwitcher />
+          </div>
 
           <div className="flex gap-2">
             <Button 
@@ -311,7 +392,10 @@ const ReportView = () => {
                             : "bg-background border shadow-sm"
                         }`}
                       >
-                        {m.content}
+                        {m.content || "..."}
+                        {m.streaming && (
+                          <span className="inline-block ml-1 w-2 h-4 bg-primary animate-pulse" />
+                        )}
                       </div>
                     </div>
                   ))
