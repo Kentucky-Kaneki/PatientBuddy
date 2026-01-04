@@ -18,20 +18,21 @@ const Dashboard = () => {
   const [user, setUser] = useState(null);
   const [members, setMembers] = useState([]);
   const [selectedMember, setSelectedMember] = useState(null);
-  const navigate = useNavigate();
-
-  /* ---------- DYNAMIC STATE ---------- */
-  const [recentActivity, setRecentActivity] = useState([]);
-  const [healthInsight, setHealthInsight] = useState(null);
-  const [healthTrends, setHealthTrends] = useState([]);
-
-   const [isModalOpen, setIsModalOpen] = useState(false);
+  const [isModalOpen, setIsModalOpen] = useState(false);
   const [isLoading, setIsLoading] = useState(true);
   const [error, setError] = useState(null);
+  const navigate = useNavigate();
+
+  const [recentActivity, setRecentActivity] = useState([]);
+  const [healthTrends, setHealthTrends] = useState([]);
+  const [healthInsight, setHealthInsight] = useState({
+    title: "No new insights",
+    message: "Upload more reports to get personalized health insights."
+  });
 
   const handleLogout = () => {
     localStorage.removeItem('token');
-    navigate("/dashboard", { replace: true });
+    navigate("/", { replace: true });
   };
 
   // fetch user and members data
@@ -43,7 +44,8 @@ const Dashboard = () => {
         if (!token) {
           setError('No token found. Please login.');
           return;
-        }
+        };
+        
         
         const response = await fetch('http://localhost:5050/api/patient/', {
           method: 'GET',
@@ -76,21 +78,20 @@ const Dashboard = () => {
   useEffect(() => {
     if (!selectedMember) return;
 
-    /* Recent Activity + Trends */
+    /* Recent Activity */
     const fetchReports = async () => {
       try {
         const res = await fetch(
-          `http://localhost:5050/api/reports/patient/${selectedMember}`
+          `http://localhost:5050/api/reports/recent/${selectedMember}`
         );
         const data = await res.json();
-
+        console.log("Recent Reports", data);
+        
         if (data.success) {
           const activity = data.reports.slice(0, 3).map((r) => ({
             type: r.reportType === "prescription" ? "prescription" : "report",
             title: r.reportName || "Medical Report",
             date: new Date(r.uploadDate).toLocaleDateString(),
-            status: r.summary ? "analyzed" : "needs attention",
-            statusColor: r.summary ? "text-success" : "text-warning",
             id: r._id,
           }));
 
@@ -102,24 +103,7 @@ const Dashboard = () => {
       }
     };
 
-    /* Health Insight */
-    const fetchInsight = async () => {
-      try {
-        const res = await fetch(
-          `http://localhost:5050/api/insights/${selectedMember}/insights`
-        );
-        const data = await res.json();
-
-        if (data.success && data.insights.length > 0) {
-          setHealthInsight(data.insights[0]);
-        }
-      } catch (err) {
-        console.error("Insight fetch failed", err);
-      }
-    };
-
     fetchReports();
-    fetchInsight();
   }, [selectedMember]);
 
   /* ---------- HELPERS ---------- */

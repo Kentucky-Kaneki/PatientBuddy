@@ -471,13 +471,19 @@ res.json({
   }
 };
 
-
+// Recently uploaded reports for a patient
 export const getPatientReports = async (req, res) => {
-  try {
-    const reports = await Report.find({ 
-      patient: req.params.patientId 
-    }).sort({ uploadDate: -1 });
-
+  const { patientId } = req.params;
+  try {    
+    const response = await Member.findById(patientId).populate({
+      path: 'reports',
+      options: { 
+        sort: { uploadDate: -1 },
+        limit: 5,
+        perDocumentLimit: 5 
+      }
+    });
+    const reports = response ? response.reports : [];
     res.json({ success: true, reports });
   } catch (error) {
     res.status(500).json({

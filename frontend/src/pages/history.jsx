@@ -32,7 +32,7 @@ const History = (props) => {
       // 🔍 DEBUG LOGS
       console.log("🔍 Token:", token ? "✅ exists" : "❌ missing");
 
-      const res = await axios.get("http://localhost:5050/api/history", {
+      const res = await axios.get("http://localhost:5050/api/patient/history", {
         params: {
           memberId: memberId,
           search: searchQuery,

@@ -11,10 +11,11 @@ import { healthCheck, uploadReport, queryReport, summarizeReport, getReport, del
 router.post('/upload', uploadReport);
 router.post('/:reportId/query', queryReport);
 router.post('/:reportId/summarize', summarizeReport);
+router.get('/patients/:patientId/reports', getPatientReports);
 router.get('/:reportId', getReport);
 router.delete('/:reportId', deleteReport);
 
-// router.get('/patients/:patientId/reports', getPatientReports);
+router.get('/recent/:patientId', getPatientReports);
 // router.get('/health', healthCheck);
 
 export default router;

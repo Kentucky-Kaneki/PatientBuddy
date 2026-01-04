@@ -16,11 +16,11 @@ const Login = () => {
   const { toast } = useToast();
   const navigate = useNavigate();
 
-  // Auto-redirect if already logged in
   useEffect(() => {
     const token = localStorage.getItem("token");
     if (token) {
-     navigate("/dashboard", { replace: true });
+      localStorage.removeItem("token");
+    //  navigate("/dashboard", { replace: true });
     }
   }, []);
 
@@ -47,6 +47,8 @@ const Login = () => {
 
       const data = await response.json();
 
+      console.log("token being stored", data);
+    
       localStorage.setItem("token", data.token);
 
       toast({

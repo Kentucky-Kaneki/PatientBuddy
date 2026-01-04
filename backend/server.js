@@ -1,3 +1,4 @@
+// server.js
 import express from "express";
 import mongoose from "mongoose";
 import dotenv from "dotenv";
@@ -5,12 +6,9 @@ import cors from "cors";
 import Groq from "groq-sdk";
 dotenv.config();
 
-import insightsRoutes from "./routes/insightsRoutes.js";
 import userRoutes from "./routes/userRoutes.js";
 import reportRoutes from "./routes/reportRoutes.js";
-import prescriptionRoutes from "./routes/prescriptionRoutes.js";
 import chatRoutes from "./routes/chatRoutes.js";
-import historyRoutes from "./routes/historyRoutes.js";
 
 const app = express();
 
@@ -26,9 +24,7 @@ app.use((req, res, next) => {
 
 app.use('/api/reports', reportRoutes);
 app.use('/api/patient', userRoutes);
-app.use('/api/insights', insightsRoutes);
 app.use("/api", chatRoutes);
-app.use("/api/history", historyRoutes);
 
 // Root route
 app.get('/', (req, res) => {
