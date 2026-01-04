@@ -134,7 +134,6 @@ const Dashboard = () => {
           `http://localhost:5050/api/reports/recent/${selectedMember}`
         );
         const data = await res.json();
-        console.log("Recent Reports", data);
         
         if (data.success) {
           const activity = data.reports.slice(0, 3).map((r) => ({
@@ -142,6 +141,8 @@ const Dashboard = () => {
             title: r.fileName || "Medical Report",
             date: new Date(r.uploadDate).toLocaleDateString(),
             id: r._id,
+            summary: r.summary,
+            fullText: r.fullText,
           }));
 
           console.log("Recent Reports are", activity);
