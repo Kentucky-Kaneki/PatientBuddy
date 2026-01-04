@@ -355,7 +355,7 @@ const Dashboard = () => {
                     {healthInsight?.message || "No insights available yet."}
                   </p>
                   <Link to="/chat">
-                    <Button variant="soft" size="sm">
+                    <Button variant="soft" size="sm" onClick={() => navigate('/chat')}>
                       Ask AI About This
                     </Button>
                   </Link>

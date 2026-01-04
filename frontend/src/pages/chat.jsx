@@ -18,6 +18,8 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Avatar, AvatarFallback } from "@/components/ui/avatar";
 import { ScrollArea } from "@/components/ui/scroll-area";
+import LanguageSwitcher from "@/components/LanguageSwitcher";
+
 
 const suggestedQuestions = [
   "What does my Vitamin D level mean?",
