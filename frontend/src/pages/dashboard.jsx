@@ -138,11 +138,13 @@ const Dashboard = () => {
         
         if (data.success) {
           const activity = data.reports.slice(0, 3).map((r) => ({
-            type: r.reportType === "prescription" ? "prescription" : "report",
-            title: r.reportName || "Medical Report",
+            type: "report",
+            title: r.fileName || "Medical Report",
             date: new Date(r.uploadDate).toLocaleDateString(),
             id: r._id,
           }));
+
+          console.log("Recent Reports are", activity);
 
           setRecentActivity(activity);
           
