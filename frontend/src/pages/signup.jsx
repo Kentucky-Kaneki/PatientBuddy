@@ -8,9 +8,13 @@ import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Checkbox } from "@/components/ui/checkbox";
 import { useToast } from "@/hooks/use-toast";
-import { useAuth } from "@/context/AuthContext";
+import { useTranslation } from "react-i18next";
+import LanguageSwitcher from "@/components/LanguageSwitcher";
+
 
 const Signup = () => {
+  const { t } = useTranslation();
+
   const [showPassword, setShowPassword] = useState(false);
   const [isLoading, setIsLoading] = useState(false);
   const [acceptTerms, setAcceptTerms] = useState(false);
@@ -21,7 +25,6 @@ const Signup = () => {
     password: "",
   });
   const { toast } = useToast();
-  const { signup } = useAuth();
 
   const handleInputChange = (e) => {
     const { id, value } = e.target;
@@ -36,8 +39,8 @@ const Signup = () => {
 
     if (!acceptTerms) {
       toast({
-        title: "Terms Required",
-        description: "Please accept the terms and conditions to continue.",
+        title: t("signup.toast.termsTitle"),
+description: t("signup.toast.termsDesc"),
         variant: "destructive",
       });
       return;
@@ -45,28 +48,45 @@ const Signup = () => {
 
     setIsLoading(true);
 
-    try {
-      const result = await signup(formData.name, formData.email, formData.password);
-
-      if (result.success) {
+    try {      
+      const response = await fetch("http://localhost:5050/api/patient/signup", {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+        },
+        body: JSON.stringify(formData),
+      });
+      
+      if (response.ok) {
+        const data = await response.json();
+    
+        // Store token
+        if (data.token) {
+          localStorage.setItem('token', data.token);
+        }
+        
         toast({
-          title: "Account Created!",
-          description: "Welcome to MediClear. Let's get started!",
+          title: t("signup.toast.successTitle"),
+description: t("signup.toast.successDesc"),
+
         });
         
         // Reset form
         setFormData({
-          name: "",
+          firstName: "",
+          lastName: "",
           email: "",
           phone: "",
           password: "",
         });
-        setAcceptTerms(false);
-        // Navigation is handled by AuthContext
+
+        // Navigate to dashboard
+        window.location.href = "/dashboard";
       } else {
         toast({
-          title: "Signup Failed",
-          description: result.error || "Please try again.",
+          title: t("signup.toast.failedTitle"),
+description: data.message || t("signup.toast.failedDesc"),
+
           variant: "destructive",
         });
       }
@@ -90,6 +110,9 @@ const Signup = () => {
         className="w-full max-w-md"
       >
         <div className="bg-card rounded-3xl shadow-elevated p-8 border border-border">
+          <div className="flex justify-end mb-4">
+  <LanguageSwitcher />
+</div>
           {/* Logo */}
           <div className="flex items-center justify-center gap-2 mb-8">
             <div className="flex items-center justify-center w-12 h-12 rounded-xl gradient-primary">
@@ -101,30 +124,35 @@ const Signup = () => {
           </div>
 
           <h1 className="text-2xl font-bold text-center mb-2">
-            Create Your Account
-          </h1>
-          <p className="text-center text-muted-foreground mb-8">
-            Start understanding your health better today
-          </p>
+  {t("signup.title")}
+</h1>
+<p className="text-center text-muted-foreground mb-8">
+  {t("signup.subtitle")}
+</p>
 
           <form onSubmit={handleSubmit} className="space-y-4">
-            <div className="space-y-2">
-              <Label htmlFor="name">Full Name</Label>
-              <div className="relative">
-                <User className="absolute left-3 top-1/2 -translate-y-1/2 w-5 h-5 text-muted-foreground" />
-                <Input
-                  id="name"
-                  value={formData.name}
-                  onChange={handleInputChange}
-                  placeholder="John Doe"
-                  className="pl-10 h-12 rounded-xl"
-                  required
-                />
+            <div className="grid grid-cols-1 gap-4">
+              <div className="space-y-2">
+                <Label htmlFor="name">{t("signup.name")}</Label>
+
+                <div className="relative">
+                  <User className="absolute left-3 top-1/2 -translate-y-1/2 w-5 h-5 text-muted-foreground" />
+                  <Input
+                    id="name"
+                    value={formData.name}
+                    onChange={handleInputChange}
+                    placeholder={t("signup.placeholderName")}
+
+                    className="pl-10 h-12 rounded-xl"
+                    required
+                  />
+                </div>
               </div>
             </div>
 
             <div className="space-y-2">
-              <Label htmlFor="email">Email Address</Label>
+              <Label htmlFor="email">{t("signup.email")}</Label>
+
               <div className="relative">
                 <Mail className="absolute left-3 top-1/2 -translate-y-1/2 w-5 h-5 text-muted-foreground" />
                 <Input
@@ -133,6 +161,7 @@ const Signup = () => {
                   value={formData.email}
                   onChange={handleInputChange}
                   placeholder="you@example.com"
+
                   className="pl-10 h-12 rounded-xl"
                   required
                 />
@@ -140,7 +169,8 @@ const Signup = () => {
             </div>
 
             <div className="space-y-2">
-              <Label htmlFor="phone">Phone Number (Optional)</Label>
+              <Label htmlFor="phone">{t("signup.phone")}</Label>
+
               <div className="relative">
                 <Phone className="absolute left-3 top-1/2 -translate-y-1/2 w-5 h-5 text-muted-foreground" />
                 <Input
@@ -148,14 +178,15 @@ const Signup = () => {
                   type="tel"
                   value={formData.phone}
                   onChange={handleInputChange}
-                  placeholder="+1 (555) 000-0000"
+                  placeholder={t("signup.placeholderPhone")}
+
                   className="pl-10 h-12 rounded-xl"
                 />
               </div>
             </div>
 
             <div className="space-y-2">
-              <Label htmlFor="password">Password</Label>
+              <Label htmlFor="password">{t("signup.password")}</Label>
               <div className="relative">
                 <Lock className="absolute left-3 top-1/2 -translate-y-1/2 w-5 h-5 text-muted-foreground" />
                 <Input
@@ -163,7 +194,8 @@ const Signup = () => {
                   type={showPassword ? "text" : "password"}
                   value={formData.password}
                   onChange={handleInputChange}
-                  placeholder="••••••••"
+                  placeholder={t("signup.placeholderPassword")}
+
                   className="pl-10 pr-10 h-12 rounded-xl"
                   required
                   minLength={8}
@@ -181,8 +213,8 @@ const Signup = () => {
                 </button>
               </div>
               <p className="text-xs text-muted-foreground">
-                Must be at least 8 characters
-              </p>
+  {t("signup.passwordHint")}
+</p>
             </div>
 
             <div className="flex items-start gap-2 py-2">
@@ -198,13 +230,14 @@ const Signup = () => {
                 htmlFor="terms"
                 className="text-sm text-muted-foreground font-normal cursor-pointer"
               >
-                I agree to the{" "}
+                {t("signup.agree")}{" "}
+
                 <Link to="/terms" className="text-primary hover:underline">
-                  Terms of Service
+                  {t("signup.terms")}
                 </Link>{" "}
                 and{" "}
                 <Link to="/privacy" className="text-primary hover:underline">
-                  Privacy Policy
+                  {t("signup.privacy")}
                 </Link>
               </Label>
             </div>
@@ -219,11 +252,11 @@ const Signup = () => {
               {isLoading ? (
                 <span className="flex items-center gap-2">
                   <span className="w-5 h-5 border-2 border-primary-foreground/30 border-t-primary-foreground rounded-full animate-spin" />
-                  Creating account...
+                  {t("signup.creating")}
                 </span>
               ) : (
                 <>
-                  Create Account
+                  {t("signup.create")}
                   <ArrowRight className="w-5 h-5" />
                 </>
               )}
@@ -232,9 +265,9 @@ const Signup = () => {
 
           <div className="mt-6 text-center">
             <p className="text-muted-foreground">
-              Already have an account?{" "}
+              {t("signup.haveAccount")}
               <Link to="/login" className="text-primary font-medium hover:underline">
-                Sign in
+                {t("signup.signin")}
               </Link>
             </p>
           </div>

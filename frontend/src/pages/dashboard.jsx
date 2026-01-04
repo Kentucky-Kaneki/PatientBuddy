@@ -1,10 +1,10 @@
 import { useState, useEffect } from "react";
+import { useNavigate } from "react-router-dom";
 import { Link } from "react-router-dom";
 import { motion } from "framer-motion";
-import { useAuth } from "../context/AuthContext";
 import {
   FileText, LogOut, Pill, MessageCircle, History,
-  Plus, Upload, TrendingUp, Heart, ChevronRight,
+  Plus, Upload, TrendingUp, User, Heart, ChevronRight,
   Calendar, AlertCircle
 } from "lucide-react";
 
@@ -12,57 +12,67 @@ import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
 
-/* ---------------- STATIC (UNCHANGED) ---------------- */
-
-const quickActions = [
-  {
-    icon: FileText,
-    title: "Upload Report",
-    description: "Medical or lab report",
-    href: "/upload/report",
-    color: "bg-primary/10 text-primary",
-  },
-  {
-    icon: Pill,
-    title: "Upload Prescription",
-    description: "Handwritten or printed",
-    href: "/upload/prescription",
-    color: "bg-success/10 text-success",
-  },
-  {
-    icon: MessageCircle,
-    title: "AI Assistant",
-    description: "Ask health questions",
-    href: "/chat",
-    color: "bg-info/10 text-info",
-  },
-  {
-    icon: History,
-    title: "View History",
-    description: "Past reports & trends",
-    href: "/history",
-    color: "bg-warning/10 text-warning",
-  },
-];
-
-const familyMembers = [
-  { name: "You", initials: "JD", color: "bg-primary", id: "self" },
-  { name: "Sarah", initials: "SD", color: "bg-info", id: "sarah" },
-  { name: "Dad", initials: "RD", color: "bg-success", id: "dad" },
-];
-
-/* ---------------- COMPONENT ---------------- */
+import AddFamilyMemberModal from "@/components/AddFamilyMemberModal";
 
 const Dashboard = () => {
-  const { user, logout } = useAuth();
-  const [selectedMember, setSelectedMember] = useState(familyMembers[0].id);
+  const [user, setUser] = useState(null);
+  const [members, setMembers] = useState([]);
+  const [selectedMember, setSelectedMember] = useState(null);
+  const navigate = useNavigate();
 
   /* ---------- DYNAMIC STATE ---------- */
   const [recentActivity, setRecentActivity] = useState([]);
   const [healthInsight, setHealthInsight] = useState(null);
   const [healthTrends, setHealthTrends] = useState([]);
 
-  /* ---------- FETCH DATA ---------- */
+   const [isModalOpen, setIsModalOpen] = useState(false);
+  const [isLoading, setIsLoading] = useState(true);
+  const [error, setError] = useState(null);
+
+  const handleLogout = () => {
+    localStorage.removeItem('token');
+    navigate("/dashboard", { replace: true });
+  };
+
+  // fetch user and members data
+  useEffect(() => {
+    const fetchUserData = async () => {
+      try {
+        setIsLoading(true);
+        const token = localStorage.getItem('token');
+        if (!token) {
+          setError('No token found. Please login.');
+          return;
+        }
+        
+        const response = await fetch('http://localhost:5050/api/patient/', {
+          method: 'GET',
+          headers: {
+            'Authorization': `Bearer ${token}`,
+            'Content-Type': 'application/json',
+          },
+        });
+
+        if (!response.ok) {
+          throw new Error('Failed to fetch user data');
+        }
+
+        const data = await response.json();
+        
+        setUser(data.user);
+        setMembers(data.user.members || []);
+        setSelectedMember(data.user.members[0]._id)  // Populated members array
+      } catch (err) {
+        setError(err.message);
+      } finally {
+        setIsLoading(false);
+      }
+    };
+
+    fetchUserData();
+  }, []);
+
+  /* ---------- FETCH ACTIVITY DATA ---------- */
   useEffect(() => {
     if (!selectedMember) return;
 
@@ -133,13 +143,8 @@ const Dashboard = () => {
     return trends.slice(0, 3);
   };
 
-  const handleLogout = () => {
-    logout();
-    navigate("/login", { replace: true });
-  };
-
-
-  /* ---------------- UI (UNCHANGED) ---------------- */
+  if (isLoading) return <div className="loading">Loading dashboard...</div>;
+  if (error) return <div className="error">Error: {error}</div>;
 
   return (
     <div className="min-h-screen bg-background">
@@ -154,13 +159,12 @@ const Dashboard = () => {
           </Link>
 
           <div className="flex items-center gap-4">
-            <Button variant="ghost" size="icon" onClick={handleLogout}>
-              <LogOut className="w-5 h-5" />
-            </Button>
             <Avatar>
               <AvatarImage />
               <AvatarFallback className="bg-primary text-primary-foreground">
-                JD
+                <Button variant="ghost" size="icon" onClick={handleLogout}>
+                  <LogOut className="w-5 h-5" />
+                </Button>
               </AvatarFallback>
             </Avatar>
           </div>
@@ -179,30 +183,95 @@ const Dashboard = () => {
             </p>
           </motion.div>
 
-          {/* Quick Actions (UNCHANGED) */}
-          <motion.div initial={{ opacity: 0, y: 20 }} animate={{ opacity: 1, y: 0 }}>
-            <h2 className="text-lg font-semibold mb-4">Quick Actions</h2>
-            <div className="grid sm:grid-cols-2 gap-4">
-              {quickActions.map((action) => (
-                <Link key={action.title} to={action.href}>
-                  <Card className="group cursor-pointer card-hover">
-                    <CardContent className="p-5 flex gap-4">
-                      <div className={`w-12 h-12 rounded-xl ${action.color} flex items-center justify-center`}>
-                        <action.icon className="w-6 h-6" />
-                      </div>
-                      <div className="flex-1">
-                        <h3 className="font-semibold">{action.title}</h3>
-                        <p className="text-sm text-muted-foreground">{action.description}</p>
-                      </div>
-                      <ChevronRight />
-                    </CardContent>
-                  </Card>
-                </Link>
-              ))}
-            </div>
-          </motion.div>
+          {/* Quick Actions*/}
+          <motion.div
+              initial={{ opacity: 0, y: 20 }}
+              animate={{ opacity: 1, y: 0 }}
+              transition={{ delay: 0.1 }}
+            >
+              <h2 className="text-lg font-semibold text-foreground mb-4">Quick Actions</h2>
+              <div className="grid sm:grid-cols-2 gap-4">
+                
+                {/* 1. Upload Report */}
+                <Card 
+                  className="group cursor-pointer card-hover border-border hover:border-primary/30"
+                  onClick={() => {
+                    navigate(`/upload/prescription?memberId=${selectedMember}`);
+                  }}
+                >
+                  <CardContent className="p-5 flex items-center gap-4">
+                    <div className="w-12 h-12 rounded-xl bg-primary/10 flex items-center justify-center group-hover:scale-110 transition-transform">
+                      <FileText className="w-6 h-6 text-primary" />
+                    </div>
+                    <div className="flex-1">
+                      <h3 className="font-semibold text-foreground">Upload Report</h3>
+                      <p className="text-sm text-muted-foreground">Medical or lab report</p>
+                    </div>
+                    <ChevronRight className="w-5 h-5 text-muted-foreground group-hover:text-primary transition-colors" />
+                  </CardContent>
+                </Card>
 
-          {/* Recent Activity (DYNAMIC) */}
+                {/* 2. Upload Prescription */}
+                <Card 
+                  className="group cursor-pointer card-hover border-border hover:border-primary/30"
+                  onClick={() => {
+                    navigate(`/upload/prescription?memberId=${selectedMember}`);
+                  }}
+                >
+                  <CardContent className="p-5 flex items-center gap-4">
+                    <div className="w-12 h-12 rounded-xl bg-success/10 flex items-center justify-center group-hover:scale-110 transition-transform">
+                      <Pill className="w-6 h-6 text-success" />
+                    </div>
+                    <div className="flex-1">
+                      <h3 className="font-semibold text-foreground">Upload Prescription</h3>
+                      <p className="text-sm text-muted-foreground">Handwritten or printed</p>
+                    </div>
+                    <ChevronRight className="w-5 h-5 text-muted-foreground group-hover:text-primary transition-colors" />
+                  </CardContent>
+                </Card>
+
+                {/* 3. AI Assistant */}
+                <Card 
+                  className="group cursor-pointer card-hover border-border hover:border-primary/30"
+                  onClick={() => {
+                    navigate(`/chat?memberId=${selectedMember}`);
+                  }}
+                >
+                  <CardContent className="p-5 flex items-center gap-4">
+                    <div className="w-12 h-12 rounded-xl bg-info/10 flex items-center justify-center group-hover:scale-110 transition-transform">
+                      <MessageCircle className="w-6 h-6 text-info" />
+                    </div>
+                    <div className="flex-1">
+                      <h3 className="font-semibold text-foreground">AI Assistant</h3>
+                      <p className="text-sm text-muted-foreground">Ask health questions</p>
+                    </div>
+                    <ChevronRight className="w-5 h-5 text-muted-foreground group-hover:text-primary transition-colors" />
+                  </CardContent>
+                </Card>
+
+                {/* 4. View History */}
+                <Card 
+                  className="group cursor-pointer card-hover border-border hover:border-primary/30"
+                  onClick={() => {
+                    navigate(`/history?memberId=${selectedMember}`);
+                  }}
+                >
+                  <CardContent className="p-5 flex items-center gap-4">
+                    <div className="w-12 h-12 rounded-xl bg-warning/10 flex items-center justify-center group-hover:scale-110 transition-transform">
+                      <History className="w-6 h-6 text-warning" />
+                    </div>
+                    <div className="flex-1">
+                      <h3 className="font-semibold text-foreground">View History</h3>
+                      <p className="text-sm text-muted-foreground">Past reports & trends</p>
+                    </div>
+                    <ChevronRight className="w-5 h-5 text-muted-foreground group-hover:text-primary transition-colors" />
+                  </CardContent>
+                </Card>
+
+              </div>
+            </motion.div>
+
+          {/* Recent Activity*/}
           <Card>
             <CardContent className="p-0 divide-y">
               {recentActivity.map((item, i) => (
@@ -260,30 +329,46 @@ const Dashboard = () => {
         {/* SIDEBAR */}
         <div className="space-y-6">
           {/* Family Profiles */}
-          <Card>
-            <CardHeader>
-              <CardTitle>Family Profiles</CardTitle>
-              <CardDescription>Switch between family members</CardDescription>
-            </CardHeader>
-            <CardContent className="space-y-2">
-              {familyMembers.map((m) => (
-                <button
-                  key={m.id}
-                  onClick={() => setSelectedMember(m.id)}
-                  className={`w-full flex gap-3 p-3 rounded-xl ${
-                    selectedMember === m.id ? "bg-primary/10 border border-primary/30" : "hover:bg-muted"
-                  }`}
-                >
-                  <Avatar>
-                    <AvatarFallback className={`${m.color} text-primary-foreground`}>
-                      {m.initials}
-                    </AvatarFallback>
-                  </Avatar>
-                  {m.name}
-                </button>
-              ))}
-            </CardContent>
-          </Card>
+          <motion.div
+              initial={{ opacity: 0, x: 20 }}
+              animate={{ opacity: 1, x: 0 }}
+              transition={{ delay: 0.2 }}
+            >
+              <Card className="border-border">
+                <CardHeader className="pb-3">
+                  <div className="flex items-center justify-between">
+                    <CardTitle className="text-lg">Member Profiles</CardTitle>
+                      <Button variant="ghost" size="icon-sm"  onClick={() => setIsModalOpen(true)}>
+                        <Plus className="w-4 h-4" />
+                      </Button>
+                  </div>
+                  <CardDescription>Switch between members</CardDescription>
+                </CardHeader>
+                <CardContent className="space-y-2">
+                  {members.map((member) => (                   
+                    <button
+                      key={member.name}
+                      onClick={() => setSelectedMember(member._id)}
+                      className={`w-full flex items-center gap-3 p-3 rounded-xl transition-colors ${
+                        selectedMember === member._id 
+                          ? "bg-primary/10 border border-primary/30" 
+                          : "hover:bg-muted"
+                      }`}
+                    >
+                      <Avatar className="h-10 w-10">
+                        <AvatarFallback className={"bg-primary text-primary-foreground"}>
+                          <User className="w-5 h-5" />
+                        </AvatarFallback>
+                      </Avatar>
+                      <span className="font-medium text-foreground">{member.name}</span>
+                      {selectedMember === member.name && (
+                        <span className="ml-auto text-xs text-primary font-medium">Active</span>
+                      )}
+                    </button>
+                  ))}
+                </CardContent>
+              </Card>
+            </motion.div>
 
           {/* Health Trends (DYNAMIC) */}
           <Card>
@@ -325,6 +410,11 @@ const Dashboard = () => {
           </Card>
         </div>
       </main>
+      <AddFamilyMemberModal
+        isOpen={isModalOpen}
+        onClose={() => setIsModalOpen(false)}
+        userId={user._id}
+      />
     </div>
   );
 };

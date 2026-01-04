@@ -2,6 +2,10 @@ import { useEffect, useState, useRef } from "react";
 import { useParams, Link } from "react-router-dom";
 import { motion } from "framer-motion";
 import ReactMarkdown from "react-markdown";
+import { useTranslation } from "react-i18next";
+import LanguageSwitcher from "@/components/LanguageSwitcher";
+
+
 import {
   ArrowLeft,
   Bot,
@@ -24,6 +28,8 @@ const API_BASE = "http://localhost:5050/api";
 
 const ReportView = () => {
   const { id: reportId } = useParams();
+  const { i18n } = useTranslation(); // ✅ ADD THIS
+  const { t } = useTranslation();
 
   const [summary, setSummary] = useState("");
   const [loadingSummary, setLoadingSummary] = useState(true);
@@ -94,25 +100,31 @@ const ReportView = () => {
      ============================= */
   useEffect(() => {
     const fetchSummary = async () => {
-      try {
-        const res = await fetch(
-          `${API_BASE}/reports/${reportId}/summarize`,
-          { method: "POST" }
-        );
-
-        const data = await res.json();
-        if (!data.success) {
-          throw new Error(data.error);
+  try {
+    const res = await fetch(
+      `${API_BASE}/reports/${reportId}/summarize`,
+      {
+        method: "POST",
+        headers: {
+          "Accept-Language": i18n.language // ✅ THIS IS THE KEY LINE
         }
-
-        setSummary(data.summary);
-        setError("");
-      } catch (err) {
-        setError(err.message || "Failed to load summary");
-      } finally {
-        setLoadingSummary(false);
       }
-    };
+    );
+
+    const data = await res.json();
+    if (!data.success) {
+      throw new Error(data.error);
+    }
+
+    setSummary(data.summary);
+    setError("");
+  } catch (err) {
+    setError(err.message || "Failed to load summary");
+  } finally {
+    setLoadingSummary(false);
+  }
+};
+
 
     fetchSummary();
   }, [reportId]);
@@ -184,12 +196,16 @@ const ReportView = () => {
             </Button>
           </Link>
 
+          <div className="flex items-center gap-3">
+  <LanguageSwitcher />
+</div>
+
           <div className="flex gap-2">
             <Button 
               variant="ghost" 
               size="icon-sm" 
               onClick={handlePrint}
-              title="Print Report"
+              title={t('report.print')}
             >
               <Printer />
             </Button>
@@ -198,7 +214,7 @@ const ReportView = () => {
               size="icon-sm"
               onClick={handleDownload}
               disabled={!summary}
-              title="Download Summary"
+              title={t('report.download')}
             >
               <Download />
             </Button>
@@ -207,7 +223,7 @@ const ReportView = () => {
               size="icon-sm"
               onClick={handleShare}
               disabled={!summary}
-              title="Share Summary"
+              title={t('report.share')}
             >
               <Share2 />
             </Button>
@@ -224,16 +240,16 @@ const ReportView = () => {
           {/* SUMMARY */}
           <Card>
             <CardHeader>
-              <CardTitle>Medical Report Summary</CardTitle>
+              <CardTitle>{t('report.title')}</CardTitle>
             </CardHeader>
             <CardContent>
               {loadingSummary && (
                 <div className="text-muted-foreground space-y-2">
                   <div className="flex items-center gap-2">
                     <div className="animate-spin rounded-full h-4 w-4 border-b-2 border-primary"></div>
-                    <p className="font-medium">Analyzing your medical report...</p>
+                    <p className="font-medium">{t('report.analyzing')}</p>
                   </div>
-                  <p className="text-sm">Please wait while we generate a comprehensive summary.</p>
+                  <p className="text-sm">{t('report.wait')}</p>
                 </div>
               )}
 
@@ -241,7 +257,7 @@ const ReportView = () => {
                 <div className="flex gap-2 text-destructive items-start">
                   <AlertCircle className="mt-0.5 flex-shrink-0" />
                   <div>
-                    <p className="font-medium">Error loading summary</p>
+                    <p className="font-medium">{t('report.errorTitle')}</p>
                     <p className="text-sm">{error}</p>
                   </div>
                 </div>
@@ -262,7 +278,7 @@ const ReportView = () => {
             <CardHeader>
               <CardTitle className="flex items-center gap-2">
                 <Bot className="text-primary" />
-                Ask Questions About This Report
+                {t('report.askQuestions')}
               </CardTitle>
             </CardHeader>
 
@@ -272,10 +288,10 @@ const ReportView = () => {
                   <div className="text-center mt-16 space-y-2">
                     <Bot className="mx-auto h-12 w-12 text-muted-foreground/50" />
                     <p className="text-muted-foreground">
-                      Ask anything about your report.
+                      {t('report.noMessages')}
                     </p>
                     <p className="text-xs text-muted-foreground/75">
-                      Example: "What medications were prescribed?" or "What were the test results?"
+                      {t('report.exampleQuestions')}
                     </p>
                   </div>
                 ) : (
@@ -313,7 +329,7 @@ const ReportView = () => {
                       sendMessage(e);
                     }
                   }}
-                  placeholder="Ask a question…"
+                  placeholder={t('report.askPlaceholder')}
                   className="flex-1 border rounded-lg px-3 py-2 focus:outline-none focus:ring-2 focus:ring-primary"
                   disabled={chatLoading}
                 />

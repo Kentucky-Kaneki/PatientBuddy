@@ -2,9 +2,33 @@
 import mongoose from "mongoose";
 import Report from "../models/Report.js";
 import Chunk from "../models/Chunk.js";
+import Member from "../models/Member.js";
 import axios from "axios";
 
 import { CloudClient } from "chromadb";
+
+export const getReport = async (req, res) => {
+  try {
+    const report = await Report.findById(req.params.reportId);
+
+    if (!report) {
+      return res.status(404).json({
+        success: false,
+        error: "Report not found"
+      });
+    }
+
+    res.json({
+      success: true,
+      report
+    });
+  } catch (error) {
+    res.status(500).json({
+      success: false,
+      error: error.message
+    });
+  }
+};
 
 // ==========================================
 // ChromaDB Client
@@ -96,21 +120,13 @@ function detectSection(text) {
 
 export const uploadReport = async (req, res) => {
   try {
-    const { patientId, fullText, fileName } = req.body;
-
-    if (!patientId || !fullText) {
-      return res.status(400).json({
-        success: false,
-        error: "Patient ID and text required",
-      });
-    }
+    const { memberId, fullText, fileName } = req.body;
 
     const reportId = new mongoose.Types.ObjectId();
     const collectionId = `report_${reportId.toString()}`;
 
     const report = new Report({
       _id: reportId,
-      patient: patientId,
       fileName: fileName || "medical_report.pdf",
       fullText,
       collectionId,
@@ -119,6 +135,12 @@ export const uploadReport = async (req, res) => {
     });
 
     await report.save();
+
+    // Add report ID to member's reports array
+    await Member.findByIdAndUpdate(
+      memberId,
+      { $push: { reports: reportId } }
+    );
 
     let collection;
     try {
@@ -333,6 +355,19 @@ Provide a clear, accurate answer based only on the information given. If the inf
 
 export const summarizeReport = async (req, res) => {
   try {
+    // 🔹 1. Detect user language from frontend
+    const lang =
+      req.headers["accept-language"]?.split(",")[0]?.split("-")[0] || "en";
+
+    const languageInstructions = {
+  en: "Respond in English.",
+  hi: "हिन्दी में उत्तर दें।",
+  mr: "मराठीत उत्तर द्या."
+};
+
+const languageInstruction =
+  languageInstructions[lang] || languageInstructions.en;
+
     const { reportId } = req.params;
 
     const apiKey = process.env.GROQ_API_KEY;
@@ -348,7 +383,7 @@ export const summarizeReport = async (req, res) => {
     if (!report) {
       return res.status(404).json({
         success: false,
-        error: "Report not found",
+        error: "Report not found"
       });
     }
 
@@ -363,12 +398,16 @@ export const summarizeReport = async (req, res) => {
 
     const results = await collection.query({
       queryEmbeddings: [queryEmbedding],
-      nResults: 10,
+      nResults: 10
     });
 
     const context = results.documents[0].join("\n\n");
 
-    const prompt = `Analyze the following medical report and provide a structured summary:
+    // 🔹 2. LANGUAGE-INJECTED PROMPT (THIS IS THE KEY FIX)
+    const prompt = `
+${languageInstruction}
+
+Analyze the following medical report and provide a structured, patient-friendly summary.
 
 ### Medical Report Summary
 
@@ -392,64 +431,55 @@ export const summarizeReport = async (req, res) => {
 **Recommendations**
 - 
 
-Medical Report:
+Medical Report Content:
 ${context}
 
-Format the response clearly. If information is missing, write "Not mentioned".`;
+Formatting rules:
+- Use clear bullet points
+- If any information is missing, write "Not mentioned"
+- Do not add information that is not present in the report
+`;
 
     const response = await rateLimitedGroqCall(apiKey, {
       model: "llama-3.1-8b-instant",
       messages: [{ role: "user", content: prompt }],
       temperature: 0.2,
-      max_tokens: 800,
+      max_tokens: 800
     });
 
     const summary = response.data.choices[0].message.content;
-    
-    report.summary = summary;
-    await report.save();
 
-    res.json({
-      success: true,
-      summary,
-      keyFindings: "Extracted from summary",
-      recommendations: "See summary section"
-    });
+    if (!report.summaries) {
+  report.summaries = {};
+}
+
+// Store summary per language
+report.summaries[lang] = summary;
+
+await report.save();
+
+res.json({
+  success: true,
+  summary: report.summaries[lang],
+});
+
   } catch (error) {
     console.error("Summarize error:", error);
-    
+
     if (error.response?.status === 429) {
       return res.status(429).json({
         success: false,
-        error: "Service is busy. Please try again in some time.",
-      });
-    }
-    
-    res.status(500).json({
-      success: false,
-      error: error.message,
-    });
-  }
-};
-
-export const getReport = async (req, res) => {
-  try {
-    const report = await Report.findById(req.params.reportId);
-    if (!report) {
-      return res.status(404).json({ 
-        success: false, 
-        error: "Report not found" 
+        error: "Service is busy. Please try again in a moment."
       });
     }
 
-    res.json({ success: true, report });
-  } catch (error) {
     res.status(500).json({
       success: false,
       error: error.message
     });
   }
 };
+
 
 export const getPatientReports = async (req, res) => {
   try {
