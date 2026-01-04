@@ -1,27 +1,45 @@
 import { useState, useCallback } from "react";
-import { useSearchParams } from 'react-router-dom';
-import { Link, useNavigate } from "react-router-dom";
-import { motion, AnimatePresence } from "framer-motion";
 import { ArrowLeft, Upload, FileText, X, CheckCircle, Loader2, Image, File, Heart } from "lucide-react";
-
-import { Button } from "@/components/ui/button";
-import { Progress } from "@/components/ui/progress";
-import { useToast } from "@/hooks/use-toast";
-
-import { getDocument, GlobalWorkerOptions } from "pdfjs-dist";
-
-// PDF worker
-GlobalWorkerOptions.workerSrc =
-  "https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.11.174/pdf.worker.min.js";
+import { motion, AnimatePresence } from "framer-motion";
 
 // 🔧 CONFIG
 const API_BASE = "http://localhost:5050/api";
 const DEMO_PATIENT_ID = "507f1f77bcf86cd799439011";
 
-const UploadReport = () => {
-  const [searchParams] = useSearchParams();
-  const memberId = searchParams.get('memberId');
+const Button = ({ children, variant = "default", size = "default", className = "", onClick, disabled }) => {
+  const baseStyles = "inline-flex items-center justify-center rounded-lg font-medium transition-colors";
+  const variants = {
+    default: "bg-gray-200 hover:bg-gray-300 text-gray-900",
+    ghost: "hover:bg-gray-100",
+    hero: "bg-gradient-to-r from-teal-500 to-cyan-500 hover:from-teal-600 hover:to-cyan-600 text-white shadow-lg shadow-teal-500/30",
+  };
+  const sizes = {
+    default: "px-4 py-2",
+    lg: "px-6 py-3 text-lg",
+    icon: "p-2",
+  };
   
+  return (
+    <button
+      className={`${baseStyles} ${variants[variant]} ${sizes[size]} ${className} ${disabled ? 'opacity-50 cursor-not-allowed' : ''}`}
+      onClick={onClick}
+      disabled={disabled}
+    >
+      {children}
+    </button>
+  );
+};
+
+const Progress = ({ value }) => (
+  <div className="w-full bg-gray-200 rounded-full h-2">
+    <div
+      className="bg-gradient-to-r from-teal-500 to-cyan-500 h-2 rounded-full transition-all"
+      style={{ width: `${value}%` }}
+    />
+  </div>
+);
+
+const UploadReport = () => {
   const [dragActive, setDragActive] = useState(false);
   const [file, setFile] = useState(null);
   const [uploadState, setUploadState] = useState("idle");
@@ -131,10 +149,10 @@ const UploadReport = () => {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
-          memberId: memberId,
+          patientId: DEMO_PATIENT_ID,
           fullText: extractedText,
           fileName: file.name,
-          autoSummarize: true, // Let backend handle summarization
+          autoSummarize: true,
         }),
       });
 
@@ -162,7 +180,7 @@ const UploadReport = () => {
       // 4️⃣ ⚡ Quick redirect
       setTimeout(() => {
         window.location.href = `/report/${uploadData.reportId}`;
-      }, 800);
+      }, 1500);
       
     } catch (err) {
       console.error(err);
@@ -172,127 +190,133 @@ const UploadReport = () => {
     }
   };
 
-  /* ---------------------------------- UI -----------------------------------*/
   const getFileIcon = (type) =>
-    type?.startsWith("image/") ? <Image className="w-6 h-6" /> : <File className="w-6 h-6" />;
+    type?.startsWith("image/") ? <Image className="w-6 h-6 text-teal-500" /> : <File className="w-6 h-6 text-teal-500" />;
 
   return (
-    <div style={{ minHeight: "100vh", background: "#fff" }}>
+    <div className="min-h-screen bg-gray-50">
       {/* Header */}
-      <header style={{ borderBottom: "1px solid #e5e7eb", padding: "1rem" }}>
-        <div style={{ maxWidth: "1200px", margin: "0 auto", display: "flex", alignItems: "center", gap: "1rem" }}>
-          <a href="/dashboard" style={{ textDecoration: "none" }}>
-            <button style={{ padding: "0.5rem", border: "none", background: "none", cursor: "pointer" }}>
-              <ArrowLeft size={20} />
-            </button>
+      <header className="sticky top-0 z-40 bg-white border-b">
+        <div className="container mx-auto px-4 py-4 flex items-center gap-4">
+          <a href="/dashboard">
+            <Button variant="ghost" size="icon">
+              <ArrowLeft className="w-5 h-5" />
+            </Button>
           </a>
-          <div style={{ display: "flex", alignItems: "center", gap: "0.5rem" }}>
-            <div style={{ width: "32px", height: "32px", borderRadius: "8px", background: "#3b82f6", display: "flex", alignItems: "center", justifyContent: "center" }}>
-              <Heart size={16} color="white" />
+          <div className="flex items-center gap-2">
+            <div className="w-8 h-8 rounded-lg bg-gradient-to-br from-teal-500 to-cyan-500 flex items-center justify-center shadow-lg shadow-teal-500/30">
+              <Heart className="w-4 h-4 text-white" />
             </div>
-            <span style={{ fontWeight: 600 }}>Upload Report</span>
+            <span className="font-semibold">Upload Report</span>
           </div>
         </div>
       </header>
 
-      <main style={{ maxWidth: "768px", margin: "0 auto", padding: "2rem 1rem" }}>
-        {uploadState === "idle" && (
-          <>
-            <div
-              style={{
-                position: "relative",
-                border: dragActive ? "2px dashed #3b82f6" : "2px dashed #d1d5db",
-                borderRadius: "1rem",
-                padding: "3rem",
-                background: dragActive ? "rgba(59, 130, 246, 0.05)" : "transparent",
-                transition: "all 0.2s"
-              }}
-              onDragEnter={handleDrag}
-              onDragOver={handleDrag}
-              onDragLeave={handleDrag}
-              onDrop={handleDrop}
+      <main className="container mx-auto px-4 py-8 max-w-4xl">
+        <AnimatePresence mode="wait">
+          {/* Upload State */}
+          {uploadState === "idle" && (
+            <motion.div
+              key="idle"
+              initial={{ opacity: 0, y: 20 }}
+              animate={{ opacity: 1, y: 0 }}
+              exit={{ opacity: 0, y: -20 }}
             >
-              <input
-                type="file"
-                style={{ position: "absolute", inset: 0, opacity: 0, cursor: "pointer" }}
-                onChange={handleFileInput}
-                accept=".pdf,.jpg,.jpeg,.png,.heic"
-              />
-              <div style={{ textAlign: "center", pointerEvents: "none" }}>
-                <Upload size={32} style={{ margin: "0 auto 1rem", color: "#3b82f6" }} />
-                <p style={{ fontWeight: 500, marginBottom: "0.5rem" }}>Drag & drop or click to upload</p>
-                <p style={{ fontSize: "0.875rem", color: "#6b7280" }}>PDF, JPEG, PNG, HEIC</p>
+              <div className="text-center mb-8">
+                <h1 className="text-3xl font-bold mb-2">Upload Medical Report</h1>
+                <p className="text-gray-600">Upload your report to analyze and get detailed insights</p>
               </div>
-            </div>
 
-            {file && (
-              <div style={{ marginTop: "1rem", display: "flex", alignItems: "center", gap: "1rem", padding: "1rem", border: "1px solid #e5e7eb", borderRadius: "0.75rem" }}>
-                {getFileIcon(file.type)}
-                <div style={{ flex: 1, minWidth: 0 }}>
-                  <p style={{ fontWeight: 500, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>{file.name}</p>
-                  <p style={{ fontSize: "0.875rem", color: "#6b7280" }}>{(file.size / 1024 / 1024).toFixed(2)} MB</p>
-                </div>
-                <button onClick={removeFile} style={{ padding: "0.5rem", border: "none", background: "none", cursor: "pointer" }}>
-                  <X size={16} />
-                </button>
-              </div>
-            )}
-
-            {file && (
-              <button
-                onClick={handleUpload}
-                style={{
-                  width: "100%",
-                  marginTop: "1.5rem",
-                  padding: "0.75rem 1.5rem",
-                  background: "#3b82f6",
-                  color: "white",
-                  border: "none",
-                  borderRadius: "0.5rem",
-                  fontSize: "1rem",
-                  fontWeight: 500,
-                  cursor: "pointer",
-                  display: "flex",
-                  alignItems: "center",
-                  justifyContent: "center",
-                  gap: "0.5rem"
-                }}
+              <div
+                className={`relative border-2 border-dashed rounded-2xl p-12 transition-all ${
+                  dragActive ? "border-teal-500 bg-teal-50" : "border-gray-300 bg-white"
+                }`}
+                onDragEnter={handleDrag}
+                onDragOver={handleDrag}
+                onDragLeave={handleDrag}
+                onDrop={handleDrop}
               >
-                <FileText size={16} />
-                Analyze Report
-              </button>
-            )}
-          </>
-        )}
+                <input
+                  type="file"
+                  className="absolute inset-0 w-full h-full opacity-0 cursor-pointer"
+                  onChange={handleFileInput}
+                  accept=".pdf,.jpg,.jpeg,.png,.heic"
+                />
 
-        {(uploadState === "uploading" || uploadState === "processing") && (
-          <div style={{ padding: "3rem", textAlign: "center", border: "1px solid #e5e7eb", borderRadius: "1rem" }}>
-            <Loader2 size={32} style={{ margin: "0 auto 1rem", animation: "spin 1s linear infinite", color: "#3b82f6" }} />
-            <p style={{ marginBottom: "1rem", fontWeight: 500 }}>
-              {uploadState === "uploading" ? "Extracting text..." : "Analyzing report..."}
-            </p>
-            <div style={{ width: "100%", height: "8px", background: "#e5e7eb", borderRadius: "4px", overflow: "hidden", marginBottom: "0.5rem" }}>
-              <div style={{ width: `${progress}%`, height: "100%", background: "#3b82f6", transition: "width 0.3s" }} />
-            </div>
-            <p style={{ fontSize: "0.875rem", color: "#6b7280" }}>{progress}%</p>
-          </div>
-        )}
+                <div className="text-center pointer-events-none">
+                  <Upload className="mx-auto mb-4 text-teal-500" size={48} />
+                  <p className="text-xl font-medium mb-2">Drag & drop or click to upload</p>
+                  <p className="text-gray-500">PDF, JPEG, PNG, HEIC supported</p>
+                </div>
+              </div>
 
-        {uploadState === "complete" && (
-          <div style={{ padding: "3rem", textAlign: "center", border: "1px solid #e5e7eb", borderRadius: "1rem", background: "rgba(34, 197, 94, 0.1)" }}>
-            <CheckCircle size={48} style={{ margin: "0 auto 1rem", color: "#22c55e" }} />
-            <p style={{ fontSize: "1.125rem", fontWeight: 500 }}>Analysis complete!</p>
-            <p style={{ fontSize: "0.875rem", color: "#6b7280", marginTop: "0.25rem" }}>Redirecting…</p>
-          </div>
-        )}
+              {file && (
+                <motion.div
+                  initial={{ opacity: 0, y: 10 }}
+                  animate={{ opacity: 1, y: 0 }}
+                  className="mt-6 flex items-center gap-4 p-4 border rounded-xl bg-white"
+                >
+                  {getFileIcon(file.type)}
+                  <div className="flex-1 min-w-0">
+                    <p className="font-medium truncate">{file.name}</p>
+                    <p className="text-sm text-gray-500">
+                      {(file.size / 1024 / 1024).toFixed(2)} MB
+                    </p>
+                  </div>
+                  <Button variant="ghost" size="icon" onClick={removeFile}>
+                    <X className="w-5 h-5" />
+                  </Button>
+                </motion.div>
+              )}
+
+              {file && (
+                <Button
+                  variant="hero"
+                  size="lg"
+                  className="w-full mt-6"
+                  onClick={handleUpload}
+                >
+                  <FileText className="mr-2 w-5 h-5" />
+                  Analyze Report
+                </Button>
+              )}
+            </motion.div>
+          )}
+
+          {/* Uploading/Processing State */}
+          {(uploadState === "uploading" || uploadState === "processing") && (
+            <motion.div
+              key="progress"
+              initial={{ opacity: 0 }}
+              animate={{ opacity: 1 }}
+              className="p-12 text-center border rounded-2xl bg-white"
+            >
+              <Loader2 className="mx-auto animate-spin mb-4 text-teal-500" size={48} />
+              <p className="text-xl font-medium mb-4">
+                {uploadState === "uploading"
+                  ? "Extracting text..."
+                  : "Analyzing report..."}
+              </p>
+              <Progress value={progress} />
+              <p className="mt-2 text-gray-600">{progress}%</p>
+            </motion.div>
+          )}
+
+          {/* Complete State */}
+          {uploadState === "complete" && (
+            <motion.div
+              key="complete"
+              initial={{ opacity: 0, scale: 0.9 }}
+              animate={{ opacity: 1, scale: 1 }}
+              className="p-12 text-center border rounded-2xl bg-green-50"
+            >
+              <CheckCircle className="mx-auto text-green-600 mb-4" size={48} />
+              <p className="text-xl font-medium">Analysis complete!</p>
+              <p className="text-sm text-gray-600 mt-2">Redirecting...</p>
+            </motion.div>
+          )}
+        </AnimatePresence>
       </main>
-
-      <style>{`
-        @keyframes spin {
-          from { transform: rotate(0deg); }
-          to { transform: rotate(360deg); }
-        }
-      `}</style>
     </div>
   );
 };

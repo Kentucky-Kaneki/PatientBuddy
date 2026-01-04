@@ -12,23 +12,18 @@ export const chatWithReports = async (req, res) => {
     console.log("📝 Chat request received");
     console.log("Body:", req.body);
 
-    // Check if API key exists
     if (!process.env.GROQ_API_KEY) {
-      console.error("❌ GROQ_API_KEY is not set!");
       return res.status(500).json({
         success: false,
         error: "Server configuration error: GROQ_API_KEY missing",
       });
     }
 
-    const groq = new Groq({
-      apiKey: process.env.GROQ_API_KEY,
-    });
+    const groq = new Groq({ apiKey: process.env.GROQ_API_KEY });
 
     const { userId, message } = req.body;
 
     if (!userId || !message) {
-      console.log("❌ Missing userId or message");
       return res.status(400).json({
         success: false,
         error: "userId and message are required",
@@ -37,22 +32,50 @@ export const chatWithReports = async (req, res) => {
 
     console.log("🔍 Fetching reports for user:", userId);
 
-    // 1️⃣ Fetch all reports for this patient
     const reports = await Report.find({ patient: userId })
       .sort({ uploadDate: -1 })
       .lean();
 
     console.log("📊 Found reports:", reports.length);
 
+    /* ======================================================
+       🟢 FALLBACK: GENERAL CHAT (NO REPORTS UPLOADED)
+       ====================================================== */
     if (!reports.length) {
+      const generalPrompt = `
+You are a friendly medical information assistant.
+
+RULES:
+- You are NOT a doctor.
+- Do NOT diagnose conditions.
+- Do NOT prescribe medicines or dosages.
+- Provide general health education only.
+- Encourage consulting a healthcare professional when appropriate.
+- Always add a medical disclaimer at the end.
+
+USER QUESTION:
+${message}
+
+Respond clearly, safely, and politely.
+`;
+
+      const completion = await groq.chat.completions.create({
+        model: "llama-3.1-8b-instant",
+        messages: [{ role: "user", content: generalPrompt }],
+        temperature: 0.4,
+        max_tokens: 600,
+      });
+
       return res.json({
         success: true,
-        answer:
-          "I don't see any medical reports uploaded yet. Please upload a report so I can help explain it.",
+        answer: completion.choices[0]?.message?.content,
       });
     }
 
-    // 2️⃣ Build medical context (ONLY stored data)
+    /* ======================================================
+       📄 RAG MODE: REPORT-BASED CHAT
+       ====================================================== */
+
     let context = reports
       .map(
         (r) => `
@@ -69,10 +92,9 @@ ${r.recommendations || "Not available"}
 `
       )
       .join("\n\n---------------------\n\n");
-    
+
     context = limitText(context);
 
-    // 3️⃣ Detect medicines mentioned in reports (TEXT-ONLY)
     const KNOWN_MEDICINES = [
       "paracetamol",
       "ibuprofen",
@@ -94,9 +116,6 @@ ${r.recommendations || "Not available"}
       });
     });
 
-    console.log("💊 Allowed medicines:", [...allowedMedicines]);
-
-    // 4️⃣ Safety-locked prompt
     const prompt = `
 You are a medical information assistant.
 
@@ -119,9 +138,6 @@ ${message}
 Respond clearly, safely, and in patient-friendly language.
 `;
 
-    console.log("🤖 Calling Groq API...");
-
-    // 5️⃣ Call Groq (same model style as OCR)
     const completion = await groq.chat.completions.create({
       model: "llama-3.1-8b-instant",
       messages: [{ role: "user", content: prompt }],
@@ -129,23 +145,15 @@ Respond clearly, safely, and in patient-friendly language.
       max_tokens: 700,
     });
 
-    const answer = completion.choices[0]?.message?.content;
-
-    console.log("✅ Response generated successfully");
-
     res.json({
       success: true,
-      answer,
+      answer: completion.choices[0]?.message?.content,
     });
   } catch (err) {
     console.error("❌ Chat error:", err);
-    console.error("Error details:", err.message);
-    console.error("Stack:", err.stack);
-    
     res.status(500).json({
       success: false,
       error: err.message || "Internal server error",
-      details: process.env.NODE_ENV === 'development' ? err.stack : undefined
     });
   }
 };

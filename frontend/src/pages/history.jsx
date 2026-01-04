@@ -1,14 +1,32 @@
-import { useEffect, useState } from 'react';
-import { useSearchParams } from 'react-router-dom';
-import { Link } from "react-router-dom";
-import { motion } from "framer-motion";
-import axios from "axios";
+import { useState } from 'react';
+import {
+  AreaChart,
+  Area,
+  XAxis,
+  YAxis,
+  CartesianGrid,
+  Tooltip,
+  ResponsiveContainer,
+  ReferenceLine,
+} from "recharts";
+import {
+  ArrowLeft,
+  FileText,
+  Pill,
+  Search,
+  ChevronRight,
+  Heart,
+  TrendingUp,
+  TrendingDown,
+  Minus,
+  X,
+  Sparkles,
+  Calendar,
+} from "lucide-react";
 
-import { ArrowLeft, FileText, Pill, Search, ChevronRight, Heart } from "lucide-react";
-
+import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
-import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 
@@ -65,14 +83,11 @@ const History = (props) => {
 
   return (
     <div className="min-h-screen bg-background">
-      {/* Header */}
-      <header className="sticky top-0 z-50 border-b bg-background">
+      <header className="sticky top-0 z-40 border-b bg-background/95 backdrop-blur">
         <div className="container mx-auto px-4 py-4 flex items-center gap-4">
-          <Link to="/dashboard">
-            <Button variant="ghost" size="icon">
-              <ArrowLeft />
-            </Button>
-          </Link>
+          <Button variant="ghost" size="icon">
+            <ArrowLeft className="w-4 h-4" />
+          </Button>
           <div className="flex items-center gap-2">
             <div className="w-8 h-8 rounded-lg bg-primary flex items-center justify-center">
               <Heart className="w-4 h-4 text-white" />
@@ -83,139 +98,77 @@ const History = (props) => {
       </header>
 
       <main className="container mx-auto px-4 py-8 max-w-4xl">
-        <motion.div initial={{ opacity: 0, y: 20 }} animate={{ opacity: 1, y: 0 }}>
-          <Tabs defaultValue="documents" className="space-y-6">
-            <TabsList className="grid grid-cols-2 h-12">
-              <TabsTrigger value="documents">Documents</TabsTrigger>
-              <TabsTrigger value="trends">Health Trends</TabsTrigger>
-            </TabsList>
+        <Tabs defaultValue="documents" className="space-y-6">
+          <TabsList className="grid grid-cols-2 h-12">
+            <TabsTrigger value="documents">Documents</TabsTrigger>
+            <TabsTrigger value="trends">Health Trends</TabsTrigger>
+          </TabsList>
 
-            {/* ================= DOCUMENTS ================= */}
-            <TabsContent value="documents" className="space-y-6">
-              <div className="flex gap-4 flex-wrap">
-                <div className="relative flex-1 min-w-[200px]">
-                  <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-5 h-5 text-muted-foreground" />
-                  <Input
-                    placeholder="Search documents..."
-                    value={searchQuery}
-                    onChange={(e) => setSearchQuery(e.target.value)}
-                    className="pl-10 h-12"
-                  />
-                </div>
-
-                {["all", "report", "prescription"].map((f) => (
-                  <Button
-                    key={f}
-                    size="sm"
-                    variant={activeFilter === f ? "default" : "outline"}
-                    onClick={() => setActiveFilter(f)}
-                    className="capitalize"
-                  >
-                    {f === "all" ? "All" : `${f}s`}
-                  </Button>
-                ))}
+          <TabsContent value="documents" className="space-y-6">
+            <div className="flex gap-4 flex-wrap">
+              <div className="relative flex-1 min-w-[200px]">
+                <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-5 h-5 text-muted-foreground" />
+                <Input placeholder="Search documents..." value={search} onChange={(e) => setSearch(e.target.value)} className="pl-10 h-12" />
               </div>
+              {["all", "report", "prescription"].map((f) => (
+                <Button key={f} size="sm" variant={filter === f ? "default" : "outline"} onClick={() => setFilter(f)} className="capitalize">
+                  {f === "all" ? "All" : `${f}s`}
+                </Button>
+              ))}
+            </div>
 
-              {/* Error Message */}
-              {error && (
-                <Card className="border-destructive">
-                  <CardContent className="p-4">
-                    <p className="text-destructive text-sm">{error}</p>
-                  </CardContent>
-                </Card>
-              )}
-
-              {/* Loading */}
-              {loading && (
-                <p className="text-center text-muted-foreground py-10">
-                  Loading history...
-                </p>
-              )}
-
-              {/* Empty */}
-              {!loading && !error && historyData.length === 0 && (
-                <Card>
-                  <CardContent className="p-10 text-center">
-                    <p className="text-muted-foreground">
-                      No documents found
-                    </p>
-                    <p className="text-sm text-muted-foreground mt-2">
-                      Upload a report or create a prescription to see them here
-                    </p>
-                  </CardContent>
-                </Card>
-              )}
-
-              {/* List */}
-              {!loading &&
-                !error &&
-                historyData.map((item) => (
-                  <Link
-                    key={item.id}
-                    to={
-                      item.type === "report"
-                        ? `/report/${item.id}`
-                        : `/prescription/${item.id}`
-                    }
-                  >
-                    <Card className="hover:border-primary/40 transition mb-4">
-                      <CardContent className="p-5 flex gap-4">
-                        <div
-                          className={`w-12 h-12 rounded-xl flex items-center justify-center shrink-0 ${
-                            item.type === "report"
-                              ? "bg-primary/10"
-                              : "bg-success/10"
-                          }`}
-                        >
-                          {item.type === "report" ? (
-                            <FileText className="text-primary" />
-                          ) : (
-                            <Pill className="text-success" />
-                          )}
-                        </div>
-
-                        <div className="flex-1 min-w-0">
-                          <h3 className="font-semibold truncate">{item.title}</h3>
-                          <p className="text-sm text-muted-foreground">
-                            {new Date(item.date).toLocaleDateString()} •{" "}
-                            {item.lab}
-                          </p>
-
-                          <div className="flex gap-2 mt-2 flex-wrap">
-                            {item.highlights?.slice(0, 3).map((h, i) => (
-                              <Badge key={i} variant="outline" className="text-xs">
-                                {h}
-                              </Badge>
-                            ))}
-                          </div>
-                        </div>
-
-                        <ChevronRight className="text-muted-foreground shrink-0" />
-                      </CardContent>
-                    </Card>
-                  </Link>
-                ))}
-            </TabsContent>
-
-            {/* ================= TRENDS ================= */}
-            <TabsContent value="trends">
+            {filtered.length === 0 ? (
               <Card>
-                <CardHeader>
-                  <CardTitle>Key Health Metrics</CardTitle>
-                </CardHeader>
-                <CardContent>
-                  <p className="text-muted-foreground text-sm">
-                    Health trends will be generated automatically from your
-                    reports.
+                <CardContent className="p-10 text-center">
+                  <p className="text-muted-foreground">No documents found</p>
+                  <p className="text-sm text-muted-foreground mt-2">
+                    {search || filter !== "all" ? "Try adjusting your search or filters" : "Upload a report or prescription to see them here"}
                   </p>
                 </CardContent>
               </Card>
-            </TabsContent>
-          </Tabs>
-        </motion.div>
+            ) : (
+              filtered.map((i) => (
+                <Card key={i.id} className="hover:border-primary/40 transition cursor-pointer">
+                  <CardContent className="p-5 flex gap-4">
+                    <div className={`w-12 h-12 rounded-xl flex items-center justify-center shrink-0 ${i.type === "report" ? "bg-primary/10" : "bg-green-500/10"}`}>
+                      {i.type === "report" ? <FileText className="text-primary w-5 h-5" /> : <Pill className="text-green-600 w-5 h-5" />}
+                    </div>
+                    <div className="flex-1 min-w-0">
+                      <h3 className="font-semibold truncate">{i.title}</h3>
+                      <p className="text-sm text-muted-foreground">
+                        {new Date(i.date).toLocaleDateString()} • {i.lab}
+                      </p>
+                      <div className="flex gap-2 mt-2 flex-wrap">
+                        {i.highlights?.slice(0, 3).map((h, idx) => (
+                          <Badge key={idx} variant="outline" className="text-xs">
+                            {h}
+                          </Badge>
+                        ))}
+                      </div>
+                    </div>
+                    <ChevronRight className="text-muted-foreground shrink-0 w-5 h-5" />
+                  </CardContent>
+                </Card>
+              ))
+            )}
+          </TabsContent>
+
+          <TabsContent value="trends" className="space-y-6">
+            <Card>
+              <CardHeader>
+                <CardTitle>Key Health Metrics</CardTitle>
+              </CardHeader>
+              <CardContent className="space-y-3">
+                {healthMetrics.map((m) => (
+                  <TrendCard key={m.name} metric={m} onClick={() => setSelected(m.name)} />
+                ))}
+              </CardContent>
+            </Card>
+          </TabsContent>
+        </Tabs>
       </main>
+
+      {selected && <HealthMetricChart metricName={selected} onClose={() => setSelected(null)} />}
     </div>
   );
-};
-
-export default History;
+}

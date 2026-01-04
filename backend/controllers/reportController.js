@@ -34,6 +34,7 @@ export const getReport = async (req, res) => {
 // ChromaDB Client
 // ==========================================
 
+
 const chromaClient = new CloudClient({
   apiKey: 'ck-5Z8wR3DvJ5ikWMWGqXjuWThjEjkL7TfrErU3sNUZzLQx',
   tenant: 'aa344572-9b98-4886-b96d-dbd64f131057',
@@ -58,13 +59,14 @@ async function generateEmbedding(text) {
       }
     );
 
-    const embeddings = response.data[0];
+    const embeddings = response.data[0]; // First token layer
     const embedding = Array.isArray(embeddings[0]) 
-      ? embeddings.map(row => row[0]).slice(0, 384)
+      ? embeddings.map(row => row[0]).slice(0, 384)  // Mean pool first token
       : embeddings.slice(0, 384);
     
     return embedding;
   } catch (error) {
+    console.log("⚠️ Using fallback embedding");
     return generateSimpleEmbedding(text);
   }
 }
@@ -209,60 +211,56 @@ export const uploadReport = async (req, res) => {
   }
 };
 
-// ==========================================
-// SMART RATE LIMITING - SILENT & EFFICIENT
-// ==========================================
-
+// Rate limiting helper
 const delay = (ms) => new Promise(resolve => setTimeout(resolve, ms));
 
-// Global queue to serialize all Groq calls
-let groqCallQueue = Promise.resolve();
-const MIN_CALL_INTERVAL = 3000; // 3 seconds between ANY calls
-let lastCallTime = 0;
+// Simple in-memory rate limiter
+let lastGroqCall = 0;
+const MIN_GROQ_INTERVAL = 10000;
 
 async function rateLimitedGroqCall(apiKey, payload) {
-  // Add this call to the queue
-  return groqCallQueue = groqCallQueue.then(async () => {
-    // Calculate wait time
-    const now = Date.now();
-    const timeSinceLastCall = now - lastCallTime;
-    const waitTime = Math.max(0, MIN_CALL_INTERVAL - timeSinceLastCall);
-    
-    if (waitTime > 0) {
-      await delay(waitTime);
-    }
-    
-    // Try the API call with retries
-    for (let attempt = 0; attempt < 5; attempt++) {
-      try {
-        lastCallTime = Date.now();
-        
-        const response = await axios.post(
-          "https://api.groq.com/openai/v1/chat/completions",
-          payload,
-          {
-            headers: {
-              Authorization: `Bearer ${apiKey}`,
-              "Content-Type": "application/json",
-            },
-            timeout: 30000,
-          }
-        );
-        
-        return response;
-      } catch (error) {
-        if (error.response?.status === 429) {
-          // Rate limited - wait longer
-          const backoffTime = Math.min(5000 * Math.pow(2, attempt), 30000);
-          await delay(backoffTime);
-          continue;
-        }
-        throw error;
+  const now = Date.now();
+  const timeSinceLastCall = now - lastGroqCall;
+  
+  if (timeSinceLastCall < MIN_GROQ_INTERVAL) {
+    await delay(MIN_GROQ_INTERVAL - timeSinceLastCall);
+  }
+  
+  lastGroqCall = Date.now();
+  
+  try {
+    const response = await axios.post(
+      "https://api.groq.com/openai/v1/chat/completions",
+      payload,
+      {
+        headers: {
+          Authorization: `Bearer ${apiKey}`,
+          "Content-Type": "application/json",
+        },
+        timeout: 30000, // 30 second timeout
       }
-    }
+    );
+    return response;
+  } catch (error) {
+    if (error.response?.status === 429) {
+      // Wait longer and retry once
+      console.log("Rate limited, waiting 5 seconds...");
     
-    throw new Error("Maximum retries exceeded");
-  });
+      await delay(5000);
+      return await axios.post(
+        "https://api.groq.com/openai/v1/chat/completions",
+        payload,
+        {
+          headers: {
+            Authorization: `Bearer ${apiKey}`,
+            "Content-Type": "application/json",
+          },
+          timeout: 30000,
+        }
+      );
+    }
+    throw error;
+  }
 }
 
 export const queryReport = async (req, res) => {
@@ -271,6 +269,7 @@ export const queryReport = async (req, res) => {
     const { query, topK = 5 } = req.body;
     const GROQ_API_KEY = process.env.GROQ_API_KEY;
     
+
     if (!query || !query.trim()) {
       return res.status(400).json({
         success: false,
@@ -312,6 +311,10 @@ Medical Report Context:
 ${context}
 
 Provide a clear, accurate answer based only on the information given. If the information is not in the context, say so.`;
+
+    console.log("calling groq");
+
+    console.log(GROQ_API_KEY);
     
     const groqResponse = await rateLimitedGroqCall(GROQ_API_KEY, {
       model: "llama-3.1-8b-instant",
@@ -319,7 +322,10 @@ Provide a clear, accurate answer based only on the information given. If the inf
       temperature: 0.3,
       max_tokens: 400,
     });
+
+    console.log("Groq bolne lagi!!!");
     
+
     const answer = groqResponse.data.choices[0].message.content;
 
     res.json({
@@ -331,17 +337,150 @@ Provide a clear, accurate answer based only on the information given. If the inf
   } catch (error) {
     console.error("Query error:", error);
     
+    // Better error message for rate limiting
     if (error.response?.status === 429) {
       return res.status(429).json({
         success: false,
-        error: "Service is busy. Please try again in a moment.",
+        error: "Service is busy. Please try again in some time.",
       });
     }
 
+    console.error(error.stack)
     res.status(500).json({
       success: false,
       error: error.message,
     });
+  }
+};
+
+// Add this function to your reportController.js
+// Place it RIGHT AFTER your existing queryReport function
+
+// ==========================================
+// ⚡ STREAMING QUERY WITH GROQ
+// ==========================================
+
+export const queryReportStream = async (req, res) => {
+  const { reportId } = req.params;
+  const { query, topK = 5 } = req.body;
+  const GROQ_API_KEY = process.env.GROQ_API_KEY;
+
+  // Set headers for Server-Sent Events
+  res.setHeader('Content-Type', 'text/event-stream');
+  res.setHeader('Cache-Control', 'no-cache');
+  res.setHeader('Connection', 'keep-alive');
+  res.setHeader('Access-Control-Allow-Origin', '*');
+
+  try {
+    // Validation
+    if (!query || !query.trim()) {
+      res.write(`data: ${JSON.stringify({ error: "Query is required" })}\n\n`);
+      return res.end();
+    }
+
+    // 1. Get report
+    const report = await Report.findById(reportId);
+    if (!report) {
+      res.write(`data: ${JSON.stringify({ error: "Report not found" })}\n\n`);
+      return res.end();
+    }
+
+    // 2. Get embedding and search ChromaDB
+    const queryEmbedding = await generateEmbedding(query);
+
+    const collection = await chromaClient.getCollection({
+      name: report.collectionId,
+      embeddingFunction: null
+    });
+
+    const results = await collection.query({
+      queryEmbeddings: [queryEmbedding],
+      nResults: topK,
+    });
+
+    const chunks = results.documents[0].map((doc, i) => ({
+      text: doc,
+      similarity: 1 - (results.distances[0][i] || 0),
+      metadata: results.metadatas[0][i],
+    }));
+
+    const context = chunks.map(c => c.text).join("\n\n");
+
+    // 3. Streaming prompt
+    const prompt = `Based on the following medical report excerpts, answer this question: "${query}"
+
+Medical Report Context:
+${context}
+
+Provide a clear, accurate answer based only on the information given. If the information is not in the context, say so.`;
+
+    // 4. ⚡ STREAM with Groq API
+    const response = await axios.post(
+      "https://api.groq.com/openai/v1/chat/completions",
+      {
+        model: "llama-3.3-70b-versatile", // Faster model for streaming
+        messages: [{ role: "user", content: prompt }],
+        temperature: 0.3,
+        max_tokens: 1024,
+        stream: true, // ⚡ Enable streaming
+      },
+      {
+        headers: {
+          Authorization: `Bearer ${GROQ_API_KEY}`,
+          "Content-Type": "application/json",
+        },
+        responseType: 'stream', // Important for axios streaming
+        timeout: 30000,
+      }
+    );
+
+    // 5. Parse and forward stream to frontend
+    response.data.on('data', (chunk) => {
+      const lines = chunk.toString().split('\n').filter(line => line.trim() !== '');
+      
+      for (const line of lines) {
+        if (line.startsWith('data: ')) {
+          const data = line.slice(6); // Remove 'data: ' prefix
+          
+          if (data === '[DONE]') {
+            res.write(`data: ${JSON.stringify({ done: true })}\n\n`);
+            continue;
+          }
+
+          try {
+            const parsed = JSON.parse(data);
+            const token = parsed.choices?.[0]?.delta?.content;
+            
+            if (token) {
+              res.write(`data: ${JSON.stringify({ token })}\n\n`);
+            }
+          } catch (e) {
+            // Skip invalid JSON
+          }
+        }
+      }
+    });
+
+    response.data.on('end', () => {
+      res.write(`data: ${JSON.stringify({ done: true })}\n\n`);
+      res.end();
+    });
+
+    response.data.on('error', (error) => {
+      console.error('Stream error:', error);
+      res.write(`data: ${JSON.stringify({ error: error.message })}\n\n`);
+      res.end();
+    });
+
+  } catch (error) {
+    console.error("Streaming query error:", error);
+    
+    if (error.response?.status === 429) {
+      res.write(`data: ${JSON.stringify({ error: "Service is busy. Please try again in a moment." })}\n\n`);
+    } else {
+      res.write(`data: ${JSON.stringify({ error: error.message })}\n\n`);
+    }
+    res.end();
   }
 };
 
@@ -361,6 +500,7 @@ const languageInstruction =
   languageInstructions[lang] || languageInstructions.en;
 
     const { reportId } = req.params;
+
     const apiKey = process.env.GROQ_API_KEY;
 
     if (!apiKey) {
